@@ -1,0 +1,1 @@
+// LLM scoring: build prompt, call model, parse+validate JSON, update job.

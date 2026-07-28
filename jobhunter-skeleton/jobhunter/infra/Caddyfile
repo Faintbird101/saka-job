@@ -1,0 +1,46 @@
+# ============================================================
+#  Caddyfile — local dev (localhost with Caddy's internal CA).
+#  For production: replace `localhost` with your domain and
+#  delete the `tls internal` line — Caddy then auto-fetches a
+#  real Let's Encrypt cert. That is the ONLY change needed.
+# ============================================================
+
+{
+	# Local dev: use Caddy's built-in CA to issue a localhost cert.
+	# (Remove this whole block in production.)
+	local_certs
+}
+
+# --- Backend API: https://localhost ---
+localhost {
+	tls internal
+
+	# Security headers applied to every response.
+	header {
+		Strict-Transport-Security "max-age=31536000;"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	encode gzip
+
+	# Everything under /api/* goes to the Go backend on the internal network.
+	# The backend is NOT published to the host — only Caddy can reach it.
+	handle_path /api/* {
+		reverse_proxy backend:8080
+	}
+
+	# n8n UI proxied under /n8n (kept off the public host port).
+	handle_path /n8n/* {
+		reverse_proxy n8n:5678
+	}
+
+	# Beszel monitoring dashboard under /monitor.
+	handle_path /monitor/* {
+		reverse_proxy beszel:8090
+	}
+
+	respond "JobHunter edge OK" 200
+}

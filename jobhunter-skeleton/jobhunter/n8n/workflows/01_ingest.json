@@ -1,0 +1,205 @@
+{
+  "name": "WF-A Ingest",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "timezone": "Africa/Nairobi"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 7,19 * * *" }
+          ]
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Twice daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-460, 0],
+      "notes": "07:00 and 19:00 local. Deliberately twice a day, not hourly: the source API has a monthly quota and every run costs a call whether or not it finds anything."
+    },
+    {
+      "parameters": {},
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Run now (manual)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-460, 180],
+      "notes": "For testing. Same path as the schedule, so a manual run exercises exactly what the cron will do."
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8080/profile",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Load profile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-240, 80],
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      },
+      "notes": "The search terms and the per-run cap live in the database, edited from the app — not hardcoded here. Changing what you search for should not require touching a workflow.\n\nNote the URL has no /api prefix: that prefix belongs to Caddy, and this call goes direct over the internal Docker network."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turn the single profile row into one search per title.\n//\n// `limit` is the profile's max_jobs_per_run — the rate-limit guard. It is\n// clamped here as well as in the backend, because a bad value would be spent\n// as real API quota before the backend ever saw it.\n\nconst profile = $input.first().json;\n\nconst titles = Array.isArray(profile.search_titles) && profile.search_titles.length > 0\n  ? profile.search_titles\n  : ['Flutter'];\n\nconst limit = Math.min(Math.max(Number(profile.max_jobs_per_run) || 10, 1), 100);\n\nreturn titles\n  .map((t) => String(t).trim())\n  .filter((t) => t.length > 0)\n  .map((query_title) => ({ json: { query_title, limit } }));"
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Build searches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-20, 80]
+    },
+    {
+      "parameters": {
+        "options": { "reset": false }
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "Loop over searches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [200, 80],
+      "notes": "One title at a time (batch size 1, the default).\n\nTwo reasons: it serialises the API calls instead of firing them in parallel at a rate-limited endpoint, and it keeps each search's title paired with its own results — a fan-in would merge every title's jobs into one undifferentiated list and the fetch_log rows would lose their meaning."
+    },
+    {
+      "parameters": {
+        "url": "https://linkedin-job-search-api.p.rapidapi.com/active-jb-7d",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "title_filter", "value": "={{ $json.query_title }}" },
+            { "name": "limit", "value": "={{ $json.limit }}" },
+            { "name": "offset", "value": "0" },
+            { "name": "description_type", "value": "text" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-rapidapi-host", "value": "linkedin-job-search-api.p.rapidapi.com" }
+          ]
+        },
+        "options": {
+          "batching": { "batch": { "batchSize": 1, "batchInterval": 2000 } },
+          "timeout": 30000,
+          "response": { "response": { "neverError": false } }
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "name": "Fetch jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 0],
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_RAPIDAPI", "name": "RapidAPI (x-rapidapi-key)" }
+      },
+      "notes": "description_type=text is what populates description_text, which the scoring step (WF-B) needs.\n\nalwaysOutputData is on so a search that matched nothing still flows downstream — a zero-result run consumed quota and must still produce a fetch_log row.\n\nErrors go out the second output rather than killing the run: one failing search should not cost you the other searches' results."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Wrap this search's results into the backend's ingest envelope.\n//\n// Everything the backend needs to dedup and log is here; the raw items are\n// passed through untouched so the backend's normaliser is the single place\n// that decides what a job row looks like.\n\nconst search = $('Loop over searches').first().json;\n\n// When the API returns an empty array, alwaysOutputData hands us one empty\n// item. Filtering on the source id drops it — and drops any malformed entry\n// that would only be rejected downstream anyway.\nconst jobs = $input.all()\n  .map((item) => item.json)\n  .filter((job) => job && job.id);\n\nreturn [{\n  json: {\n    query_title: search.query_title,\n    notes: `WF-A ${$execution.id}`,\n    jobs,\n  },\n}];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "Wrap batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8080/internal/jobs/ingest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000008",
+      "name": "Ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 0],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      },
+      "notes": "The backend does the normalising, the three-guard dedup, and the fetch_log write. This node just hands over the batch.\n\nIt returns 200 with {returned, inserted, skipped} even when everything was a duplicate — that is a normal run, not a failure, so do NOT add a retry on a low inserted count."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8080/internal/errors",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: 'WF-A', message: ($json.error?.message || $json.message || 'ingest step failed'), context: { execution_id: $execution.id, node: $json.error?.name || null, detail: $json } }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "Record failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 220],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      },
+      "notes": "Application-health logging, distinct from Beszel's system-health monitoring. A failure recorded here shows up in the app's error feed and in GET /stats.\n\nIt loops back into the batch loop so one failed search does not abandon the remaining ones, and its own onError is continueRegularOutput so a logging failure can never become the thing that breaks the run."
+    }
+  ],
+  "connections": {
+    "Twice daily": {
+      "main": [[{ "node": "Load profile", "type": "main", "index": 0 }]]
+    },
+    "Run now (manual)": {
+      "main": [[{ "node": "Load profile", "type": "main", "index": 0 }]]
+    },
+    "Load profile": {
+      "main": [[{ "node": "Build searches", "type": "main", "index": 0 }]]
+    },
+    "Build searches": {
+      "main": [[{ "node": "Loop over searches", "type": "main", "index": 0 }]]
+    },
+    "Loop over searches": {
+      "main": [
+        [],
+        [{ "node": "Fetch jobs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch jobs": {
+      "main": [
+        [{ "node": "Wrap batch", "type": "main", "index": 0 }],
+        [{ "node": "Record failure", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wrap batch": {
+      "main": [[{ "node": "Ingest", "type": "main", "index": 0 }]]
+    },
+    "Ingest": {
+      "main": [
+        [{ "node": "Loop over searches", "type": "main", "index": 0 }],
+        [{ "node": "Record failure", "type": "main", "index": 0 }]
+      ]
+    },
+    "Record failure": {
+      "main": [[{ "node": "Loop over searches", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {}
+}

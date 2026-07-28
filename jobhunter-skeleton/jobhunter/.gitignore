@@ -1,0 +1,21 @@
+.env
+*.env.local
+
+# Go
+backend/bin/
+backend/api
+backend/api.exe
+
+# Flutter / Dart
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+mobile/pubspec.lock
+mobile/.packages
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
