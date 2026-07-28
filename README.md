@@ -181,7 +181,7 @@ A monorepo: backend, app, automation, and infra in one place so they stay in
 sync and one `docker compose up` runs everything.
 
 ```
-jobhunter/
+saka-job/                     <- repository root
 ├── README.md                 <- you are here
 ├── .env.example              <- copy to .env and fill in secrets
 ├── .gitignore
@@ -201,7 +201,7 @@ jobhunter/
 │       ├── service/          <- business logic between handlers and db
 │       ├── ingest/           <- normalize API payload + dedup + insert
 │       │   └── urlnorm.go    <- URL normalization for dedup (see below)
-│       └── scoring/          <- LLM scoring: prompt, call, parse, update
+│       └── scoring/          <- LLM scoring: prompt, call, parse, update (WF-B, todo)
 │
 ├── mobile/                   <- Flutter app (feature-first)
 │   ├── pubspec.yaml
