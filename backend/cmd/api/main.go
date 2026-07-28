@@ -15,6 +15,7 @@ import (
 	"github.com/yourname/jobhunter/backend/internal/config"
 	"github.com/yourname/jobhunter/backend/internal/db"
 	"github.com/yourname/jobhunter/backend/internal/handlers"
+	"github.com/yourname/jobhunter/backend/internal/scoring"
 	"github.com/yourname/jobhunter/backend/internal/service"
 	"github.com/yourname/jobhunter/backend/pkg/logger"
 )
@@ -55,7 +56,23 @@ func run() error {
 	}
 	log.Info("schema up to date")
 
-	svc := service.New(database, log)
+	// Scoring is optional: without a key the API still boots and serves
+	// everything else, and only /internal/scoring/run reports itself
+	// unavailable. Refusing to start would take the whole pipeline down over a
+	// stage that may not be configured yet.
+	var scorer scoring.Client
+	scorerModel := cfg.LLMModel
+	if scorerModel == "" {
+		scorerModel = scoring.DefaultModel
+	}
+	if c, err := scoring.NewAnthropicClient(cfg.LLMAPIKey, scorerModel); err != nil {
+		log.Warn("scoring disabled", "reason", err)
+	} else {
+		scorer = c
+		log.Info("scoring enabled", "model", c.Model())
+	}
+
+	svc := service.New(database, log, scorer, scorerModel)
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: handlers.Router(cfg, database, svc, log),

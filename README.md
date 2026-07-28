@@ -447,7 +447,12 @@ the way through — then widened. Recommended order:
    value is still the `your_new_key_here` placeholder). See `n8n/README.md`.
 5. [ ] **Minimal app screen** — the read endpoints exist, so this is Flutter
    work only: list ingested jobs from `GET /jobs`.
-6. [ ] **Scoring** (WF-B + `/internal/scoring`) with strict JSON validation.
+6. [~] **Scoring** (WF-B + `/internal/scoring/run`) with strict JSON
+   validation. Built and unit-tested; blocked on a real `LLM_API_KEY` and a
+   non-empty `master_cv` in the profile. Note the source API returns no job
+   description on our plan, so scoring runs on the AI-extracted fields
+   (`ai_key_skills`, `ai_keywords`, `ai_requirements_summary`) — which is the
+   cost-saving path this README already argued for.
 7. [ ] **CV/cover-letter generation** (WF-C).
 8. [ ] **Approval in the app** -> `PATCH /jobs/{id}`.
 9. [ ] **Sending + follow-ups** (WF-D, WF-E).

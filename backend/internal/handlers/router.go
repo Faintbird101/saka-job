@@ -61,6 +61,7 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 		r.Use(middleware.RequireRole(middleware.RoleN8N))
 
 		r.Post("/internal/jobs/ingest", h.Ingest)
+		r.Post("/internal/scoring/run", h.RunScoring)
 		r.Post("/internal/errors", h.RecordError)
 	})
 

@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/yourname/jobhunter/backend/internal/db"
 	"github.com/yourname/jobhunter/backend/internal/models"
+	"github.com/yourname/jobhunter/backend/internal/scoring"
 )
 
 // Sentinel errors the handler layer maps onto HTTP status codes.
@@ -32,11 +33,18 @@ var (
 type Service struct {
 	db  *db.DB
 	log *slog.Logger
+
+	// scorer is nil when LLM_API_KEY is unset. That is a supported state: the
+	// API must still boot and serve /jobs on a machine where scoring has not
+	// been configured, so the scoring endpoint reports its own absence rather
+	// than the whole process refusing to start.
+	scorer      scoring.Client
+	scorerModel string
 }
 
-// New builds a Service.
-func New(database *db.DB, log *slog.Logger) *Service {
-	return &Service{db: database, log: log}
+// New builds a Service. scorer may be nil.
+func New(database *db.DB, log *slog.Logger, scorer scoring.Client, scorerModel string) *Service {
+	return &Service{db: database, log: log, scorer: scorer, scorerModel: scorerModel}
 }
 
 // row is the subset of pgx.Row / pgx.Rows that scanJob needs, so the same

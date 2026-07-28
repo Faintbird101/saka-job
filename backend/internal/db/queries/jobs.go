@@ -195,3 +195,16 @@ const StatusCounts = `SELECT status, count(*) FROM jobs GROUP BY status`
 
 // CountAllJobs is the dashboard total.
 const CountAllJobs = `SELECT count(*) FROM jobs`
+
+// ListJobsByStatus pulls a batch of work for a pipeline stage — WF-B asks for
+// `New`, WF-C for `Scored`, and so on.
+//
+// Oldest first: a job that has been sitting in the queue since yesterday
+// morning should be scored before one that arrived ten minutes ago, or a busy
+// search term could starve the backlog indefinitely.
+const ListJobsByStatus = `
+SELECT ` + JobColumns + `
+FROM jobs
+WHERE status = $1
+ORDER BY created_at ASC
+LIMIT $2`

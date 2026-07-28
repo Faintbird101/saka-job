@@ -15,6 +15,10 @@ services:
     ports:
       - "7080:7080"
       - "7443:7443"
+      # n8n and beszel each get a port so they can be served at "/" without a
+      # path prefix — both break when hosted under one. See the Caddyfile.
+      - "7444:7444"
+      - "7445:7445"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddydata:/data
@@ -45,10 +49,12 @@ services:
       # n8n now has its own hostname, so it lives at "/" rather than under a
       # path prefix. That removes the URL-rewriting problems that path-prefix
       # hosting causes for its editor assets and webhook URLs.
-      N8N_HOST: n8n.sakajob.home
       N8N_PROTOCOL: https
       N8N_PROXY_HOPS: "1"
-      WEBHOOK_URL: https://n8n.sakajob.home:7443/
+      # Reachable two ways: https://n8n.sakajob.home:7443 once the hosts-file
+      # entries exist, and https://localhost:7444 always. N8N_HOST is left
+      # unset so n8n does not reject whichever of the two you use.
+      WEBHOOK_URL: https://localhost:7444/
     expose: ["5678"]
     volumes: ["n8ndata:/home/node/.n8n"]
     depends_on: [postgres]

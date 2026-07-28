@@ -71,10 +71,12 @@ https://hub.sakajob.home:7443 {
 	reverse_proxy beszel:8090
 }
 
-# --- localhost fallback, kept deliberately ---
+# --- localhost fallbacks, kept deliberately ---
 # The hosts file is a manual, admin-only step, and a machine that hasn't had it
-# applied yet would otherwise have no way to reach anything. This block also
-# keeps every documented curl example working. Path-prefixed, as before.
+# applied yet would otherwise have no way to reach anything.
+#
+# The API keeps its /api/* prefix here: it serves JSON and never emits an
+# absolute asset path, so a prefix costs it nothing.
 https://localhost:7443 {
 	tls internal
 	import common
@@ -82,14 +84,26 @@ https://localhost:7443 {
 	handle_path /api/* {
 		reverse_proxy backend:8080
 	}
-	handle_path /n8n/* {
-		reverse_proxy n8n:5678
-	}
-	handle_path /monitor/* {
-		reverse_proxy beszel:8090
-	}
 
-	respond "JobHunter edge OK — try https://api.sakajob.home:7443" 200
+	respond "JobHunter edge OK — API at /api/, n8n on :7444, monitoring on :7445" 200
+}
+
+# n8n and beszel get a PORT each rather than a path prefix, because both build
+# absolute asset URLs from the site root. Served under /n8n/, n8n's HTML loads
+# but every /static/* request lands on the block above and gets the plain-text
+# banner instead of JavaScript, so the editor never boots — which looks exactly
+# like a broken login. A dedicated port puts each app at "/" with no rewriting,
+# and Caddy is still the only thing exposed to the host.
+https://localhost:7444 {
+	tls internal
+	import common
+	reverse_proxy n8n:5678
+}
+
+https://localhost:7445 {
+	tls internal
+	import common
+	reverse_proxy beszel:8090
 }
 
 # --- plain HTTP redirects to HTTPS ---

@@ -7,7 +7,7 @@ container's SQLite file.
 | File              | ID   | Status | What it does |
 |-------------------|------|--------|--------------|
 | `01_ingest.json`  | WF-A | built  | Cron → read profile → RapidAPI → `POST /internal/jobs/ingest` |
-| `02_score.json`   | WF-B | todo   | `New` jobs → LLM score → `Scored` / `LowMatch` |
+| `02_score.json`   | WF-B | built  | `New` jobs → LLM score → `Scored` / `LowMatch` / `ScoreFailed` |
 | `03_generate.json`| WF-C | todo   | `Scored` → CV + cover letter → `AwaitingApproval` |
 | `04_send.json`    | WF-D | todo   | `Approved` → email → `Applied` |
 | `05_followup.json`| WF-E | todo   | Daily → `Applied` 7d+ with no reply → `FollowUpSent` |
@@ -122,6 +122,44 @@ the run.
 nothing still consumed an API call, so it still flows through and still writes
 a `fetch_log` row. Likewise, a run reporting `inserted: 0, skipped: 40` means
 the dedup guards did their job — do **not** add a retry on a low insert count.
+
+---
+
+## How WF-B is put together
+
+```
+After each ingest ─┐
+                   ├─▶ Score a batch ──▶ Any ScoreFailed? ──(yes)──▶ Record problem
+Run now ───────────┘         │                    │
+                             └──(error)───────────┴──(no)──▶ done
+```
+
+Deliberately thin: it is one HTTP call. The backend owns the prompt, the model
+call, the strict JSON validation, and the threshold decision — see
+`backend/internal/scoring/`.
+
+**Why the logic is not in n8n.** The scoring rubric is business logic and
+belongs in version control next to the code, where it can be diffed and unit
+tested. Keeping it there also means the LLM key never leaves the backend, and
+the "unparseable reply → ScoreFailed" path uses the same state machine as
+every other stage rather than a bespoke n8n branch.
+
+**It is not chained to WF-A.** WF-B runs 20 minutes after each ingest and picks
+up whatever is sitting in `New`. The two stages communicate through
+`jobs.status`, not an n8n connection, so if WF-A fails or overruns, WF-B just
+finds fewer jobs — and anything left over from an earlier run gets picked up
+rather than stranded.
+
+**Timeout is 10 minutes.** The backend scores sequentially, one model call per
+job, so a batch of 10 legitimately takes minutes. Scoring in parallel would be
+faster but makes rate-limit handling and partial failure much harder to reason
+about for a batch this size.
+
+**A 400 means it is not configured** — no `LLM_API_KEY`, or an empty
+`master_cv` in the profile. That is not retryable, so it is recorded rather
+than retried. The empty-CV check exists because scoring against nothing would
+park every job in `LowMatch` while looking like a successful run, having billed
+a model call per job to do it.
 
 ---
 

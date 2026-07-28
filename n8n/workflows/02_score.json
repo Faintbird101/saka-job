@@ -1,0 +1,123 @@
+{
+  "name": "WF-B Score",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "timezone": "Africa/Nairobi"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "20 7,19 * * *" }
+          ]
+        }
+      },
+      "id": "b2000000-0000-4000-8000-000000000001",
+      "name": "After each ingest",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-420, 0],
+      "notes": "20 minutes after WF-A's 07:00 and 19:00 runs, so the jobs it ingested are sitting in `New` and ready.\n\nNot chained directly onto WF-A on purpose: the two stages communicate through the `jobs.status` column, not through an n8n connection. If WF-A fails or is still running, WF-B simply finds whatever is in `New` — including anything left over from a previous run — and nothing is lost or double-processed."
+    },
+    {
+      "parameters": {},
+      "id": "b2000000-0000-4000-8000-000000000002",
+      "name": "Run now (manual)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-420, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8080/internal/scoring/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ limit: 10 }) }}",
+        "options": { "timeout": 600000 }
+      },
+      "id": "b2000000-0000-4000-8000-000000000003",
+      "name": "Score a batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-160, 80],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      },
+      "notes": "One call does the whole batch. The backend builds the prompt, calls the model, validates the JSON strictly, and moves each job to Scored or LowMatch — or ScoreFailed if the reply could not be parsed.\n\nWhy not do the model call here in n8n: the prompt and the scoring rubric are business logic that belong in version control next to the code, the LLM key then never leaves the backend, and the strict-validation-then-ScoreFailed path is the same state machine the rest of the pipeline uses.\n\nThe 10-minute timeout is deliberate: the backend scores sequentially, one model call per job, so a batch of 10 can legitimately take minutes.\n\nA 400 means it is not ready — no LLM key, or an empty master_cv in the profile. That is a configuration problem, so it is reported and NOT retried."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "failed-check",
+              "leftValue": "={{ $json.failed }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b2000000-0000-4000-8000-000000000004",
+      "name": "Any ScoreFailed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [120, 0],
+      "notes": "A run where some jobs failed to score is not a failed run — the rest were scored fine. But ScoreFailed rows are invisible unless something says so, and they sit there until a later run retries them."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8080/internal/errors",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: 'WF-B', message: ($json.failed !== undefined ? `${$json.failed} of ${$json.considered} jobs could not be scored` : ($json.error?.message || 'scoring run failed')), context: { execution_id: $execution.id, detail: $json } }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "b2000000-0000-4000-8000-000000000005",
+      "name": "Record problem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [380, 120],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      },
+      "notes": "Handles both shapes: a run that completed with some ScoreFailed rows, and a run that failed outright (no LLM key, empty master_cv, backend down).\n\nIts own onError is continueRegularOutput so a logging failure can never become the thing that breaks the run."
+    }
+  ],
+  "connections": {
+    "After each ingest": {
+      "main": [[{ "node": "Score a batch", "type": "main", "index": 0 }]]
+    },
+    "Run now (manual)": {
+      "main": [[{ "node": "Score a batch", "type": "main", "index": 0 }]]
+    },
+    "Score a batch": {
+      "main": [
+        [{ "node": "Any ScoreFailed?", "type": "main", "index": 0 }],
+        [{ "node": "Record problem", "type": "main", "index": 0 }]
+      ]
+    },
+    "Any ScoreFailed?": {
+      "main": [
+        [{ "node": "Record problem", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "pinData": {}
+}

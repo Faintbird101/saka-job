@@ -122,3 +122,30 @@ func (h *Handler) Ingest(w http.ResponseWriter, r *http.Request) {
 	}
 	h.writeJSON(w, r, http.StatusOK, res)
 }
+
+// RunScoring handles POST /internal/scoring/run — WF-B's entry point.
+//
+// n8n triggers it on a schedule; the backend owns the prompt, the model call,
+// the strict JSON validation, and the threshold decision. Keeping all of that
+// here rather than in n8n means the LLM key never leaves the backend, and the
+// scoring rubric is versioned in git rather than inside a workflow node.
+func (h *Handler) RunScoring(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Limit int `json:"limit"`
+	}
+	// An empty body is valid and means "use the default batch size", so a
+	// decode failure on an absent body must not be an error.
+	if r.ContentLength > 0 {
+		if err := decodeJSON(w, r, &body); err != nil {
+			h.badRequest(w, r, "invalid request body: "+err.Error())
+			return
+		}
+	}
+
+	run, err := h.svc.ScoreNewJobs(r.Context(), body.Limit)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	h.writeJSON(w, r, http.StatusOK, run)
+}
