@@ -18,22 +18,42 @@ container's SQLite file.
 
 ### 1. Create the n8n owner account
 
-Open `https://localhost:8443/n8n/` (or `https://localhost/n8n/` if host ports
-80/443 were free on your machine) and complete the setup screen. n8n has no
-account yet, so nothing can be imported until this is done.
+Open **`https://n8n.sakajob.home:7443`** (or the fallback
+`https://localhost:7443/n8n/` if you haven't added the hosts entries yet — see
+`infra/README.md`). Accept the self-signed certificate warning.
 
-### 2. Create the two credentials
+n8n has no account at all yet, so its first screen is a setup form asking for
+an email, a name, and a password. These are **local to your n8n instance** —
+they are not an Anthropic, GitHub, or RapidAPI login, and nothing is sent
+anywhere. Fill them in and continue. Until this is done, nothing can be
+imported and the API is locked.
 
-Both are the generic **Header Auth** type. The workflow references them by
-name, so use these names exactly and the import will bind them automatically.
+### 2. Give n8n access to the backend and to RapidAPI
 
-| Credential name                 | Header name      | Value                        |
+This is the part that answers "how do I give n8n access?" — n8n reaches both
+services over plain HTTP headers, and you store those headers once as
+**credentials** so no secret is ever written into a workflow file.
+
+In the n8n UI: **Credentials → Add credential → search "Header Auth" → Header
+Auth**. Create it twice:
+
+| Credential name (use exactly)   | Header Name      | Header Value                 |
 |---------------------------------|------------------|------------------------------|
-| `JobHunter backend (n8n key)`   | `X-API-Key`      | `N8N_API_KEY` from `.env`    |
-| `RapidAPI (x-rapidapi-key)`     | `x-rapidapi-key` | `RAPIDAPI_KEY` from `.env`   |
+| `JobHunter backend (n8n key)`   | `X-API-Key`      | the `N8N_API_KEY` value from `.env` |
+| `RapidAPI (x-rapidapi-key)`     | `x-rapidapi-key` | the `RAPIDAPI_KEY` value from `.env` |
 
-Use the **n8n key**, not the app token. The backend rejects the app token on
-`/internal/*` with a 403 — that separation is the point of having two.
+Copy the values out of `jobhunter/.env`. The names matter: the workflow
+references its credentials by name, so matching them exactly means the import
+binds automatically instead of leaving you to fix three red nodes by hand.
+
+Use the **n8n key**, not the app token. The backend answers `/internal/*` with
+a 403 for the app token — that separation is the whole point of having two
+credentials, and it is what stops a leaked phone token from injecting rows into
+the jobs table.
+
+Nothing else is needed to "give access": the backend authorises purely on that
+header, and n8n reaches it at `http://backend:8080` over the internal Docker
+network (already verified working), never through Caddy.
 
 ### 3. Import the workflow
 
@@ -50,7 +70,10 @@ will. Then check the result in the app's data:
 
 ```bash
 curl -k -H "Authorization: Bearer $API_AUTH_TOKEN" \
-  https://localhost:8443/api/fetch-logs?limit=1
+  "https://api.sakajob.home:7443/fetch-logs?limit=1"
+# or, without hosts entries:
+curl -k -H "Authorization: Bearer $API_AUTH_TOKEN" \
+  "https://localhost:7443/api/fetch-logs?limit=1"
 ```
 
 A successful run writes one `fetch_log` row per search title, with

@@ -1,14 +1,20 @@
 # ============================================================
 #  Full local stack. Caddy is the ONLY thing exposed to the
-#  host (80/443). backend, n8n, postgres, beszel are reachable
+#  host (7080/7443). backend, n8n, postgres, beszel are reachable
 #  only on the internal Docker network — that is the hardening.
+#
+#  Ports are 7080/7443, not 80/443, and deliberately so: they are
+#  unlikely to collide with anything else on a dev machine, and on
+#  this one 80/443 are already held by an unrelated stack. The
+#  container listens on the same numbers it publishes, which keeps
+#  Caddy's redirects and Host matching consistent.
 # ============================================================
 services:
   caddy:
     image: caddy:2
     ports:
-      - "80:80"
-      - "443:443"
+      - "7080:7080"
+      - "7443:7443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddydata:/data
@@ -36,10 +42,13 @@ services:
     image: n8nio/n8n:latest
     env_file: [../.env]
     environment:
-      # Tell n8n it lives behind Caddy under /n8n.
-      N8N_PATH: /n8n/
+      # n8n now has its own hostname, so it lives at "/" rather than under a
+      # path prefix. That removes the URL-rewriting problems that path-prefix
+      # hosting causes for its editor assets and webhook URLs.
+      N8N_HOST: n8n.sakajob.home
+      N8N_PROTOCOL: https
       N8N_PROXY_HOPS: "1"
-      WEBHOOK_URL: https://localhost/n8n/
+      WEBHOOK_URL: https://n8n.sakajob.home:7443/
     expose: ["5678"]
     volumes: ["n8ndata:/home/node/.n8n"]
     depends_on: [postgres]

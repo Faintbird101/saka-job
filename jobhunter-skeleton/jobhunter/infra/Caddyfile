@@ -1,21 +1,42 @@
 # ============================================================
-#  Caddyfile — local dev (localhost with Caddy's internal CA).
-#  For production: replace `localhost` with your domain and
-#  delete the `tls internal` line — Caddy then auto-fetches a
-#  real Let's Encrypt cert. That is the ONLY change needed.
+#  Caddyfile — hostname-routed local dev.
+#
+#  Each service gets its own name instead of a path prefix:
+#
+#      https://api.sakajob.home:7443     backend
+#      https://n8n.sakajob.home:7443     n8n
+#      https://hub.sakajob.home:7443     beszel monitoring
+#
+#  Why names instead of /api, /n8n, /monitor: an app hosted under a path prefix
+#  has to rewrite every absolute URL it emits, and both n8n and beszel are
+#  fiddly about it. On its own hostname each app is simply at "/" and none of
+#  that applies.
+#
+#  Ports 7080/7443 rather than 80/443: another stack on this machine binds
+#  0.0.0.0:80 and :443. Docker Desktop does not honour per-loopback-IP binds
+#  (a `-p 127.0.0.2:443` request still tries to allocate 0.0.0.0:443 and
+#  fails), so a distinct port pair is the only option. Caddy listens on the
+#  SAME port numbers inside the container as outside, which keeps redirects,
+#  certificate SANs, and Host matching all consistent.
+#
+#  Requires these lines in the hosts file (see infra/README.md):
+#      127.0.0.1  api.sakajob.home
+#      127.0.0.1  n8n.sakajob.home
+#      127.0.0.1  hub.sakajob.home
+#
+#  For production: replace the .home names with real domains, drop the :7443
+#  suffixes and the `tls internal` lines, and map 80/443. Caddy then fetches
+#  real Let's Encrypt certificates automatically.
 # ============================================================
 
 {
-	# Local dev: use Caddy's built-in CA to issue a localhost cert.
+	# Local dev: issue certificates from Caddy's own CA.
 	# (Remove this whole block in production.)
 	local_certs
 }
 
-# --- Backend API: https://localhost ---
-localhost {
-	tls internal
-
-	# Security headers applied to every response.
+# Shared response hardening + compression, applied to every site below.
+(common) {
 	header {
 		Strict-Transport-Security "max-age=31536000;"
 		X-Content-Type-Options "nosniff"
@@ -23,24 +44,55 @@ localhost {
 		Referrer-Policy "no-referrer"
 		-Server
 	}
-
 	encode gzip
+}
 
-	# Everything under /api/* goes to the Go backend on the internal network.
-	# The backend is NOT published to the host — only Caddy can reach it.
+# --- Backend API ---
+# The path convention differs from the localhost fallback below: here the API
+# is at the root (https://api.sakajob.home:7443/jobs), because there is no
+# prefix to strip.
+https://api.sakajob.home:7443 {
+	tls internal
+	import common
+	reverse_proxy backend:8080
+}
+
+# --- n8n ---
+https://n8n.sakajob.home:7443 {
+	tls internal
+	import common
+	reverse_proxy n8n:5678
+}
+
+# --- Beszel monitoring hub ---
+https://hub.sakajob.home:7443 {
+	tls internal
+	import common
+	reverse_proxy beszel:8090
+}
+
+# --- localhost fallback, kept deliberately ---
+# The hosts file is a manual, admin-only step, and a machine that hasn't had it
+# applied yet would otherwise have no way to reach anything. This block also
+# keeps every documented curl example working. Path-prefixed, as before.
+https://localhost:7443 {
+	tls internal
+	import common
+
 	handle_path /api/* {
 		reverse_proxy backend:8080
 	}
-
-	# n8n UI proxied under /n8n (kept off the public host port).
 	handle_path /n8n/* {
 		reverse_proxy n8n:5678
 	}
-
-	# Beszel monitoring dashboard under /monitor.
 	handle_path /monitor/* {
 		reverse_proxy beszel:8090
 	}
 
-	respond "JobHunter edge OK" 200
+	respond "JobHunter edge OK — try https://api.sakajob.home:7443" 200
+}
+
+# --- plain HTTP redirects to HTTPS ---
+http://api.sakajob.home:7080, http://n8n.sakajob.home:7080, http://hub.sakajob.home:7080, http://localhost:7080 {
+	redir https://{host}:7443{uri} permanent
 }

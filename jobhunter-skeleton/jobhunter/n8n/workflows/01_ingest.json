@@ -72,16 +72,16 @@
     },
     {
       "parameters": {
-        "url": "https://linkedin-job-search-api.p.rapidapi.com/active-jb-7d",
+        "url": "https://linkedin-job-search-api.p.rapidapi.com/active-jb",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "title_filter", "value": "={{ $json.query_title }}" },
+            { "name": "time_frame", "value": "7d" },
+            { "name": "title", "value": "={{ $json.query_title }}" },
             { "name": "limit", "value": "={{ $json.limit }}" },
-            { "name": "offset", "value": "0" },
-            { "name": "description_type", "value": "text" }
+            { "name": "offset", "value": "0" }
           ]
         },
         "sendHeaders": true,
@@ -106,7 +106,7 @@
       "credentials": {
         "httpHeaderAuth": { "id": "REPLACE_ME_RAPIDAPI", "name": "RapidAPI (x-rapidapi-key)" }
       },
-      "notes": "description_type=text is what populates description_text, which the scoring step (WF-B) needs.\n\nalwaysOutputData is on so a search that matched nothing still flows downstream — a zero-result run consumed quota and must still produce a fetch_log row.\n\nErrors go out the second output rather than killing the run: one failing search should not cost you the other searches' results."
+      "notes": "Endpoint and parameter names verified against the live API on 2026-07-28: the path is /active-jb (NOT /active-jb-7d), time_frame is REQUIRED and must be one of 1h/24h/7d/6m, and the search parameter is `title` (not `title_filter`).\n\nThis plan returns no job description — description_text comes back null, and there is no parameter that enables it. WF-B must score against ai_key_skills / ai_keywords / ai_requirements_summary instead, which is what the README's cost-saving plan assumed anyway.\n\nalwaysOutputData is on so a search that matched nothing still flows downstream — a zero-result run consumed quota and must still produce a fetch_log row.\n\nErrors go out the second output rather than killing the run: one failing search should not cost you the other searches' results."
     },
     {
       "parameters": {

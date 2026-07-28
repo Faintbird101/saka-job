@@ -347,18 +347,18 @@ backend, n8n, Postgres, Beszel — is reachable only on the internal Docker
 network.
 
 ```
-host :80/:443 -> Caddy -+-> /api/*      backend:8080
-                        +-> /n8n/*      n8n:5678
-                        +-> /monitor/*  beszel:8090
+host :7080/:7443 -> Caddy -+-> api.sakajob.home  backend:8080
+                           +-> n8n.sakajob.home  n8n:5678
+                           +-> hub.sakajob.home  beszel:8090
                  postgres      (internal only — no host port)
                  beszel-agent  (host network, collects metrics)
 ```
 
-- **HTTPS in dev:** Caddy's internal CA issues a real (self-signed) cert for
-  `localhost`. Your browser/curl will warn — that's expected; use `curl -k`
-  locally.
-- **HTTPS in prod:** edit the `Caddyfile` — replace `localhost` with your
-  domain and remove the `tls internal` line. Caddy then auto-fetches a real
+- **HTTPS in dev:** Caddy's internal CA issues real (self-signed) certs for
+  each `.home` hostname. Your browser/curl will warn — that's expected; use
+  `curl -k` locally, or trust Caddy's root CA (see `infra/README.md`).
+- **HTTPS in prod:** edit the `Caddyfile` — replace the `.home` names with your
+  domains, drop the `:7443` suffixes, and remove the `tls internal` lines. Caddy then auto-fetches a real
   Let's Encrypt certificate. That is the *only* change.
 - **Security headers** (HSTS, nosniff, DENY framing, etc.) are applied to
   every response at the edge.
@@ -392,28 +392,34 @@ docker compose up -d
 #    hand before the runner existed, it records the existing migrations as
 #    already applied rather than re-running them.) Nothing to do here.
 
-# 4. Reach the services (self-signed cert in dev, so use -k with curl):
-#    Backend API:  https://localhost/api/...
-#    n8n UI:       https://localhost/n8n/
-#    Monitoring:   https://localhost/monitor/
+# 4. Add the local hostnames (once, as Administrator) — see infra/README.md:
+#      127.0.0.1  api.sakajob.home
+#      127.0.0.1  n8n.sakajob.home
+#      127.0.0.1  hub.sakajob.home
+
+# 5. Reach the services (self-signed cert in dev, so use -k with curl):
+#    Backend API:  https://api.sakajob.home:7443/...
+#    n8n UI:       https://n8n.sakajob.home:7443
+#    Monitoring:   https://hub.sakajob.home:7443
 #
-#    If infra/docker-compose.override.yml exists, host ports 80/443 were taken
-#    on this machine and the edge is remapped — use https://localhost:8443/...
+#    The edge is on 7080/7443, not 80/443 — those are commonly taken, and on
+#    this machine another stack holds them. Without the hosts entries above,
+#    everything is still reachable path-prefixed at https://localhost:7443/api/…
 
-# 4b. Smoke-test it:
-#    curl -k https://localhost:8443/api/health
-#    curl -k -H "Authorization: Bearer $API_AUTH_TOKEN" https://localhost:8443/api/jobs
+# 5b. Smoke-test it:
+#    curl -k https://api.sakajob.home:7443/health
+#    curl -k -H "Authorization: Bearer $API_AUTH_TOKEN" https://api.sakajob.home:7443/jobs
 
-# 5. Import workflows from n8n/workflows/ into the n8n UI.
+# 6. Import workflows from n8n/workflows/ into the n8n UI (see n8n/README.md).
 
-# 6. Run the app
+# 7. Run the app
 cd ../mobile
 flutter pub get
 flutter run
 ```
 
 ### Beszel agent
-After first boot, open `https://localhost/monitor/`, register the agent, copy
+After first boot, open `https://hub.sakajob.home:7443`, register the agent, copy
 its key into `.env` as `BESZEL_AGENT_KEY`, then
 `docker compose up -d beszel-agent`.
 
