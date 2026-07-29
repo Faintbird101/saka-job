@@ -36,29 +36,32 @@ are fiddly about it; on its own hostname each app is simply at `/`.
 | `https://api.sakajob.home:7443`  | backend API (at `/`) |
 | `https://n8n.sakajob.home:7443`  | n8n editor         |
 | `https://hub.sakajob.home:7443`  | beszel monitoring  |
-| `https://localhost:7443/api/…`   | fallback, path-prefixed |
+| `https://localhost:7443/api/…`   | API fallback, path-prefixed |
+| `https://localhost:7444`         | n8n fallback |
+| `https://localhost:7445`         | monitoring fallback |
 
-**These names need a hosts-file entry to resolve.** This is a manual,
-administrator-only step — it could not be scripted here because writes to the
-hosts file hang under Windows Defender's Controlled Folder Access.
+**Beszel's admin UI is at `/_/`** (it is PocketBase underneath) — the root
+serves the dashboard SPA. The `beszel-agent` container exits until you register
+an agent in that UI and put its key in `.env` as `BESZEL_AGENT_KEY`; that is
+expected, not a fault.
 
-Open Notepad **as Administrator**, open
-`C:\Windows\System32\drivers\etc\hosts`, and append:
+**These names need a hosts-file entry to resolve** — already added on this
+machine. To reproduce elsewhere, append to
+`C:\Windows\System32\drivers\etc\hosts`:
 
     # ---- JobHunter (saka-job) local hostnames ----
     127.0.0.1  api.sakajob.home
     127.0.0.1  n8n.sakajob.home
     127.0.0.1  hub.sakajob.home
 
-If Defender blocks the save, allow Notepad through
-*Windows Security → Virus & threat protection → Ransomware protection →
-Allow an app through Controlled folder access*.
+Note: PowerShell writes to that file hang under Windows Defender's Controlled
+Folder Access, but a plain shell append works. Verify with
+`ping api.sakajob.home` — it should answer from `127.0.0.1`.
 
-Verify with `ping api.sakajob.home` — it should answer from `127.0.0.1`.
-
-**Until then, use the `https://localhost:7443/api/…` fallback**, which is kept
-in the Caddyfile precisely so a machine without the hosts entries still works.
-You can also test the hostname routing without touching the hosts file at all:
+Fallbacks are kept for a machine without the entries: the API at
+`https://localhost:7443/api/…`, n8n at `https://localhost:7444`, monitoring at
+`https://localhost:7445`. You can also test hostname routing without the hosts
+file at all:
 
     curl -k --resolve api.sakajob.home:7443:127.0.0.1 https://api.sakajob.home:7443/health
 

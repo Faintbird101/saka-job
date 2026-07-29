@@ -51,10 +51,10 @@ services:
       # hosting causes for its editor assets and webhook URLs.
       N8N_PROTOCOL: https
       N8N_PROXY_HOPS: "1"
-      # Reachable two ways: https://n8n.sakajob.home:7443 once the hosts-file
-      # entries exist, and https://localhost:7444 always. N8N_HOST is left
-      # unset so n8n does not reject whichever of the two you use.
-      WEBHOOK_URL: https://localhost:7444/
+      # Reachable two ways: https://n8n.sakajob.home:7443 (the intended URL)
+      # and https://localhost:7444 (fallback). N8N_HOST is left unset so n8n
+      # accepts whichever of the two you use rather than rejecting one.
+      WEBHOOK_URL: https://n8n.sakajob.home:7443/
     expose: ["5678"]
     volumes: ["n8ndata:/home/node/.n8n"]
     depends_on: [postgres]

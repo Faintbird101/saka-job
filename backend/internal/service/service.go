@@ -34,17 +34,15 @@ type Service struct {
 	db  *db.DB
 	log *slog.Logger
 
-	// scorer is nil when LLM_API_KEY is unset. That is a supported state: the
-	// API must still boot and serve /jobs on a machine where scoring has not
-	// been configured, so the scoring endpoint reports its own absence rather
-	// than the whole process refusing to start.
-	scorer      scoring.Client
-	scorerModel string
+	// scorer may be nil — only when the configured mode could not be built
+	// (llm mode with no key). The API still boots and serves everything else;
+	// only /internal/scoring/run reports itself unavailable.
+	scorer scoring.Scorer
 }
 
 // New builds a Service. scorer may be nil.
-func New(database *db.DB, log *slog.Logger, scorer scoring.Client, scorerModel string) *Service {
-	return &Service{db: database, log: log, scorer: scorer, scorerModel: scorerModel}
+func New(database *db.DB, log *slog.Logger, scorer scoring.Scorer) *Service {
+	return &Service{db: database, log: log, scorer: scorer}
 }
 
 // row is the subset of pgx.Row / pgx.Rows that scanJob needs, so the same

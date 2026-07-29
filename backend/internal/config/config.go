@@ -38,10 +38,13 @@ type Config struct {
 	RapidAPIHost string
 	LLMAPIKey    string
 	LLMModel     string
-	SMTPHost     string
-	SMTPPort     int
-	SMTPUser     string
-	SMTPPass     string
+	// ScoringMode selects the scorer: "keyword" (default, free, no key) or
+	// "llm" (needs LLMAPIKey). See internal/scoring.
+	ScoringMode string
+	SMTPHost    string
+	SMTPPort    int
+	SMTPUser    string
+	SMTPPass    string
 }
 
 // IsDev reports whether we're running in development mode.
@@ -73,6 +76,7 @@ func Load() (Config, error) {
 
 		RapidAPIKey:  os.Getenv("RAPIDAPI_KEY"),
 		RapidAPIHost: os.Getenv("RAPIDAPI_HOST"),
+		ScoringMode:  strings.ToLower(getDefault("SCORING_MODE", "keyword")),
 		LLMAPIKey:    os.Getenv("LLM_API_KEY"),
 		LLMModel:     os.Getenv("LLM_MODEL"),
 		SMTPHost:     os.Getenv("SMTP_HOST"),
@@ -123,6 +127,12 @@ func (c Config) validate() error {
 	// privilege levels into one.
 	if c.AppToken == c.N8NKey {
 		return fmt.Errorf("API_AUTH_TOKEN and N8N_API_KEY must be different values")
+	}
+
+	switch c.ScoringMode {
+	case "keyword", "llm":
+	default:
+		return fmt.Errorf("SCORING_MODE must be \"keyword\" or \"llm\", got %q", c.ScoringMode)
 	}
 	return nil
 }

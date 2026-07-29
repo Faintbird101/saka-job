@@ -19,7 +19,7 @@ type ScoreRun struct {
 	LowMatch   int      `json:"low_match"`
 	Failed     int      `json:"failed"`
 	Threshold  int      `json:"threshold"`
-	Model      string   `json:"model"`
+	Scorer     string   `json:"scorer"`
 	JobIDs     []string `json:"job_ids"`
 }
 
@@ -48,7 +48,7 @@ const MaxScoreBatch = 50
 //     rest of the pipeline uses.
 func (s *Service) ScoreNewJobs(ctx context.Context, limit int) (ScoreRun, error) {
 	if s.scorer == nil {
-		return ScoreRun{}, fmt.Errorf("%w: scoring is not configured — set LLM_API_KEY and restart", ErrInvalidInput)
+		return ScoreRun{}, fmt.Errorf("%w: scoring is not configured — set SCORING_MODE=keyword for the free scorer, or supply LLM_API_KEY for SCORING_MODE=llm", ErrInvalidInput)
 	}
 	if limit <= 0 {
 		limit = DefaultScoreBatch
@@ -78,7 +78,7 @@ func (s *Service) ScoreNewJobs(ctx context.Context, limit int) (ScoreRun, error)
 	run := ScoreRun{
 		Considered: len(jobs),
 		Threshold:  profile.MinScoreThreshold,
-		Model:      s.scorerModel,
+		Scorer:     s.scorer.Name(),
 		JobIDs:     make([]string, 0, len(jobs)),
 	}
 
@@ -106,15 +106,15 @@ func (s *Service) ScoreNewJobs(ctx context.Context, limit int) (ScoreRun, error)
 // scoreOne scores a single job and writes the outcome. It returns the status
 // the job ended in.
 func (s *Service) scoreOne(ctx context.Context, profile models.Profile, job models.Job) (string, error) {
-	userPrompt := scoring.BuildUserPrompt(profile, job)
-
-	reply, err := s.scorer.Complete(ctx, scoring.SystemPrompt(), userPrompt)
+	result, err := s.scorer.Score(ctx, profile, job)
 	if err == nil {
-		var result scoring.Result
-		result, err = scoring.Parse(reply)
-		if err == nil {
-			return s.applyScore(ctx, profile, job, result, userPrompt)
+		// Only the LLM path has a prompt worth auditing; the keyword scorer is
+		// deterministic, so its inputs are already the stored job row.
+		audit := ""
+		if l, ok := s.scorer.(*scoring.LLMScorer); ok {
+			audit = l.Prompt(profile, job)
 		}
+		return s.applyScore(ctx, profile, job, result, audit)
 	}
 
 	// Either the call or the parse failed. Park the job so the next run can
@@ -145,23 +145,26 @@ func (s *Service) applyScore(ctx context.Context, profile models.Profile, job mo
 	matchedRaw := json.RawMessage(matched)
 	missingRaw := json.RawMessage(missing)
 
-	// prompt_used stores the rendered user turn: it is the audit trail for
-	// "why did this get 42?", and it is what you diff when a prompt change
-	// moves scores.
-	audit := prompt
-
-	if _, err := s.UpdateJob(ctx, job.ID, models.JobUpdate{
+	update := models.JobUpdate{
 		Status:        &status,
 		Score:         &r.Score,
 		MatchedSkills: &matchedRaw,
 		MissingSkills: &missingRaw,
 		AISummary:     &r.Summary,
-		PromptUsed:    &audit,
-	}); err != nil {
+	}
+	// prompt_used is the audit trail for "why did this get 42?". Only the LLM
+	// path has one; leaving it nil in keyword mode keeps the column honest
+	// rather than storing a reconstruction that was never actually sent.
+	if prompt != "" {
+		update.PromptUsed = &prompt
+	}
+
+	if _, err := s.UpdateJob(ctx, job.ID, update); err != nil {
 		return "", fmt.Errorf("write score for job %s: %w", job.ID, err)
 	}
 
-	s.log.Info("job scored", "job_id", job.ID, "score", r.Score, "status", status, "title", job.Title)
+	s.log.Info("job scored", "job_id", job.ID, "score", r.Score, "status", status,
+		"scorer", s.scorer.Name(), "title", job.Title)
 	return status, nil
 }
 

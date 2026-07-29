@@ -18,9 +18,8 @@ container's SQLite file.
 
 ### 1. Create the n8n owner account
 
-Open **`https://n8n.sakajob.home:7443`** (or the fallback
-`https://localhost:7443/n8n/` if you haven't added the hosts entries yet — see
-`infra/README.md`). Accept the self-signed certificate warning.
+Open **`https://n8n.sakajob.home:7443`** (fallback: `https://localhost:7444`).
+Accept the self-signed certificate warning.
 
 n8n has no account at all yet, so its first screen is a setup form asking for
 an email, a name, and a password. These are **local to your n8n instance** —
@@ -155,8 +154,8 @@ job, so a batch of 10 legitimately takes minutes. Scoring in parallel would be
 faster but makes rate-limit handling and partial failure much harder to reason
 about for a batch this size.
 
-**A 400 means it is not configured** — no `LLM_API_KEY`, or an empty
-`master_cv` in the profile. That is not retryable, so it is recorded rather
+**A 400 means it is not configured** — an unsatisfiable `SCORING_MODE`, or an
+empty `master_cv` in the profile. That is not retryable, so it is recorded rather
 than retried. The empty-CV check exists because scoring against nothing would
 park every job in `LowMatch` while looking like a successful run, having billed
 a model call per job to do it.

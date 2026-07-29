@@ -18,6 +18,7 @@ import (
 	"github.com/yourname/jobhunter/backend/internal/scoring"
 	"github.com/yourname/jobhunter/backend/internal/service"
 	"github.com/yourname/jobhunter/backend/pkg/logger"
+	"log/slog"
 )
 
 func main() {
@@ -25,6 +26,28 @@ func main() {
 		fmt.Fprintf(os.Stderr, "fatal: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// buildScorer resolves SCORING_MODE into a Scorer, or nil if the configured
+// mode cannot be satisfied.
+func buildScorer(cfg config.Config, log *slog.Logger) scoring.Scorer {
+	if scoring.Mode(cfg.ScoringMode) == scoring.ModeLLM {
+		model := cfg.LLMModel
+		if model == "" {
+			model = scoring.DefaultModel
+		}
+		client, err := scoring.NewAnthropicClient(cfg.LLMAPIKey, model)
+		if err != nil {
+			log.Error("SCORING_MODE=llm but no usable key; scoring is disabled",
+				"reason", err, "hint", "set SCORING_MODE=keyword for the free scorer")
+			return nil
+		}
+		log.Info("scoring enabled", "mode", "llm", "model", model)
+		return scoring.NewLLMScorer(client, model)
+	}
+
+	log.Info("scoring enabled", "mode", "keyword", "cost", "free")
+	return scoring.NewKeywordScorer()
 }
 
 // run does the real work and returns an error, so every failure path gets the
@@ -56,23 +79,11 @@ func run() error {
 	}
 	log.Info("schema up to date")
 
-	// Scoring is optional: without a key the API still boots and serves
-	// everything else, and only /internal/scoring/run reports itself
-	// unavailable. Refusing to start would take the whole pipeline down over a
-	// stage that may not be configured yet.
-	var scorer scoring.Client
-	scorerModel := cfg.LLMModel
-	if scorerModel == "" {
-		scorerModel = scoring.DefaultModel
-	}
-	if c, err := scoring.NewAnthropicClient(cfg.LLMAPIKey, scorerModel); err != nil {
-		log.Warn("scoring disabled", "reason", err)
-	} else {
-		scorer = c
-		log.Info("scoring enabled", "model", c.Model())
-	}
-
-	svc := service.New(database, log, scorer, scorerModel)
+	// Pick the scorer. Keyword mode is the default and always available; LLM
+	// mode needs a key, and if it is missing we degrade to no scorer rather
+	// than refusing to boot — the rest of the API must keep serving.
+	scorer := buildScorer(cfg, log)
+	svc := service.New(database, log, scorer)
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: handlers.Router(cfg, database, svc, log),

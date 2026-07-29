@@ -32,6 +32,12 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 	// configured, and it deliberately reveals nothing beyond up/down.
 	r.Get("/health", health.Health)
 
+	// The CV editor is a static shell with no data in it — a browser cannot
+	// attach an auth header to a plain navigation, so gating the HTML would
+	// make it unreachable. The page asks for the token and every call it makes
+	// is authenticated like any other client. See profile_page.go.
+	r.Get("/profile/edit", h.ProfilePage)
+
 	// ---- app + n8n: either credential is accepted ----
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(cfg))

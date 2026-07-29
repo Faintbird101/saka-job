@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JobHunter — Profile</title>
+<style>
+  :root {
+    --bg: #12131a; --panel: #1b1d27; --line: #2c2f3d;
+    --text: #e7e9f0; --dim: #9aa0b4; --accent: #6ea8fe;
+    --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f7fa; --panel: #fff; --line: #e2e5ee;
+      --text: #1b1d27; --dim: #6b7186; --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1rem; background: var(--bg); color: var(--text);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+  .sub { color: var(--dim); margin: 0 0 1.5rem; font-size: .9rem; }
+  fieldset {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.1rem 1.2rem; margin: 0 0 1rem;
+  }
+  legend { padding: 0 .4rem; font-weight: 600; font-size: .85rem; color: var(--dim);
+           text-transform: uppercase; letter-spacing: .04em; }
+  label { display: block; font-weight: 600; margin: .9rem 0 .3rem; font-size: .9rem; }
+  label:first-of-type { margin-top: 0; }
+  .hint { font-weight: 400; color: var(--dim); font-size: .82rem; margin: .15rem 0 .4rem; }
+  input, textarea {
+    width: 100%; padding: .55rem .7rem; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 7px; font: inherit;
+  }
+  textarea { min-height: 260px; resize: vertical; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 13px; }
+  input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .row > div { flex: 1 1 200px; }
+  button {
+    background: var(--accent); color: #fff; border: 0; border-radius: 7px;
+    padding: .6rem 1.3rem; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  .actions { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+  #msg { margin-left: .2rem; font-size: .9rem; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  .counter { color: var(--dim); font-size: .8rem; text-align: right; margin-top: .25rem; }
+  .skills { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
+  .chip { background: var(--bg); border: 1px solid var(--line); border-radius: 999px;
+          padding: .15rem .6rem; font-size: .8rem; color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1>JobHunter profile</h1>
+  <p class="sub">Your CV and search settings. Scoring compares every ingested job against this.</p>
+
+  <fieldset>
+    <legend>Access</legend>
+    <label for="token">App token</label>
+    <div class="hint">The <code>API_AUTH_TOKEN</code> value from your <code>.env</code>. Kept in this tab only (sessionStorage) — never stored on the server, never sent anywhere but this API.</div>
+    <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="paste API_AUTH_TOKEN">
+    <div class="actions" style="margin-top:.7rem">
+      <button id="load" class="ghost" type="button">Load profile</button>
+      <span id="msg"></span>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Master CV</legend>
+    <div class="hint">Plain text. Skills are matched against this, so make sure the technologies you actually know appear by name — "Flutter", "Dart", "Go", "PostgreSQL". Formatting is irrelevant; content is what matters.</div>
+    <textarea id="master_cv" spellcheck="false" placeholder="Paste your CV here…"></textarea>
+    <div class="counter"><span id="cv_count">0</span> characters</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Search &amp; scoring</legend>
+    <div class="row">
+      <div>
+        <label for="search_titles">Job titles to search</label>
+        <div class="hint">Comma-separated. Drives what WF-A fetches.</div>
+        <input id="search_titles" placeholder="Flutter, Dart Developer">
+      </div>
+      <div>
+        <label for="preferred_skills">Preferred skills</label>
+        <div class="hint">Comma-separated. Weighted most heavily when scoring.</div>
+        <input id="preferred_skills" placeholder="Flutter, Dart, Go">
+      </div>
+    </div>
+    <div class="skills" id="skill_chips"></div>
+    <div class="row" style="margin-top:.9rem">
+      <div>
+        <label for="min_score_threshold">Score threshold</label>
+        <div class="hint">At or above this → <code>Scored</code>; below → <code>LowMatch</code>.</div>
+        <input id="min_score_threshold" type="number" min="0" max="100">
+      </div>
+      <div>
+        <label for="max_jobs_per_run">Max jobs per run</label>
+        <div class="hint">Rate-limit guard for the source API.</div>
+        <input id="max_jobs_per_run" type="number" min="1" max="100">
+      </div>
+    </div>
+  </fieldset>
+
+  <div class="actions">
+    <button id="save" type="button" disabled>Save profile</button>
+    <span id="savemsg"></span>
+  </div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  // Same-origin: the page is served by the API itself, so this works on
+  // whichever hostname or port you reached it through.
+  var API = window.location.origin;
+  var KEY = "jobhunter_token";
+
+  function say(el, text, cls) {
+    el.textContent = text;
+    el.className = cls || "";
+  }
+
+  function splitList(s) {
+    return s.split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+  }
+
+  function headers() {
+    return {
+      "Authorization": "Bearer " + $("token").value.trim(),
+      "Content-Type": "application/json"
+    };
+  }
+
+  function renderChips() {
+    var box = $("skill_chips");
+    box.innerHTML = "";
+    splitList($("preferred_skills").value).forEach(function (s) {
+      var el = document.createElement("span");
+      el.className = "chip";
+      el.textContent = s;
+      box.appendChild(el);
+    });
+  }
+
+  function countCV() {
+    $("cv_count").textContent = $("master_cv").value.length.toLocaleString();
+  }
+
+  function load() {
+    var t = $("token").value.trim();
+    if (!t) { say($("msg"), "Enter the app token first.", "warn"); return; }
+    sessionStorage.setItem(KEY, t);
+    say($("msg"), "Loading…", "");
+
+    fetch(API + "/profile", { headers: headers() })
+      .then(function (r) {
+        if (r.status === 401) { throw new Error("Token rejected — check API_AUTH_TOKEN in .env"); }
+        if (!r.ok) { throw new Error("HTTP " + r.status); }
+        return r.json();
+      })
+      .then(function (p) {
+        $("master_cv").value = p.master_cv || "";
+        $("search_titles").value = (p.search_titles || []).join(", ");
+        $("preferred_skills").value = (p.preferred_skills || []).join(", ");
+        $("min_score_threshold").value = p.min_score_threshold;
+        $("max_jobs_per_run").value = p.max_jobs_per_run;
+        countCV(); renderChips();
+        $("save").disabled = false;
+        say($("msg"), "Loaded.", "ok");
+      })
+      .catch(function (e) { say($("msg"), e.message, "bad"); });
+  }
+
+  function save() {
+    var cv = $("master_cv").value.trim();
+    if (!cv) {
+      say($("savemsg"), "CV is empty — scoring refuses to run without it.", "warn");
+      return;
+    }
+    $("save").disabled = true;
+    say($("savemsg"), "Saving…", "");
+
+    fetch(API + "/profile", {
+      method: "PATCH",
+      headers: headers(),
+      body: JSON.stringify({
+        master_cv: cv,
+        search_titles: splitList($("search_titles").value),
+        preferred_skills: splitList($("preferred_skills").value),
+        min_score_threshold: parseInt($("min_score_threshold").value, 10),
+        max_jobs_per_run: parseInt($("max_jobs_per_run").value, 10)
+      })
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          if (!r.ok) { throw new Error((b.error && b.error.message) || ("HTTP " + r.status)); }
+          return b;
+        });
+      })
+      .then(function () {
+        say($("savemsg"), "Saved. Scoring will use this on the next run.", "ok");
+        $("save").disabled = false;
+      })
+      .catch(function (e) {
+        say($("savemsg"), e.message, "bad");
+        $("save").disabled = false;
+      });
+  }
+
+  $("load").addEventListener("click", load);
+  $("save").addEventListener("click", save);
+  $("master_cv").addEventListener("input", countCV);
+  $("preferred_skills").addEventListener("input", renderChips);
+  $("token").addEventListener("keydown", function (e) { if (e.key === "Enter") { load(); } });
+
+  // Restore the token within this tab so a reload doesn't mean re-pasting it.
+  var saved = sessionStorage.getItem(KEY);
+  if (saved) { $("token").value = saved; load(); }
+})();
+</script>
+</body>
+</html>
