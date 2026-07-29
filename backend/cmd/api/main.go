@@ -32,17 +32,14 @@ func main() {
 // mode cannot be satisfied.
 func buildScorer(cfg config.Config, log *slog.Logger) scoring.Scorer {
 	if scoring.Mode(cfg.ScoringMode) == scoring.ModeLLM {
-		model := cfg.LLMModel
-		if model == "" {
-			model = scoring.DefaultModel
-		}
-		client, err := scoring.NewAnthropicClient(cfg.LLMAPIKey, model)
+		client, model, err := scoring.NewLLMClient(
+			scoring.Provider(cfg.LLMProvider), cfg.LLMAPIKey, cfg.LLMModel)
 		if err != nil {
-			log.Error("SCORING_MODE=llm but no usable key; scoring is disabled",
+			log.Error("SCORING_MODE=llm but the client could not be built; scoring is disabled",
 				"reason", err, "hint", "set SCORING_MODE=keyword for the free scorer")
 			return nil
 		}
-		log.Info("scoring enabled", "mode", "llm", "model", model)
+		log.Info("scoring enabled", "mode", "llm", "provider", cfg.LLMProvider, "model", model)
 		return scoring.NewLLMScorer(client, model)
 	}
 
@@ -87,12 +84,13 @@ func run() error {
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: handlers.Router(cfg, database, svc, log),
-		// Generous write timeout relative to the handler timeout so a slow
-		// response is cut off by chi's timeout middleware (which produces a
-		// clean 504) rather than by the server dropping the connection.
+		// These must not undercut the longest handler timeout, or the server
+		// drops the connection before chi can return a clean 504 — and the
+		// client sees an opaque "unexpected EOF" instead of a timeout.
+		// Scoring is the longest route, so it sets the floor.
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      cfg.Timeout + 15*time.Second,
+		ReadTimeout:       cfg.ScoringTimeout + 30*time.Second,
+		WriteTimeout:      cfg.ScoringTimeout + 30*time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
 

@@ -26,7 +26,11 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recover(log))
 	r.Use(middleware.Logger(log))
-	r.Use(chimw.Timeout(cfg.Timeout))
+
+	// NOTE: the request timeout is applied per route group below, NOT here.
+	// A root-level Timeout wraps every route, and a longer timeout nested
+	// inside cannot override a shorter one outside it — the outer deadline
+	// still fires first. Scoring needs minutes, so it gets its own group.
 
 	// Unauthenticated. The health check has to answer before credentials are
 	// configured, and it deliberately reveals nothing beyond up/down.
@@ -40,6 +44,7 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 
 	// ---- app + n8n: either credential is accepted ----
 	r.Group(func(r chi.Router) {
+		r.Use(chimw.Timeout(cfg.Timeout))
 		r.Use(middleware.Auth(cfg))
 
 		r.Get("/jobs", h.ListJobs)
@@ -51,6 +56,9 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 
 		r.Get("/profile", h.GetProfile)
 		r.Patch("/profile", h.PatchProfile)
+		// Extracts text from an uploaded PDF/DOCX and returns it for review.
+		// It does not save — the editor shows you the text first.
+		r.Post("/profile/cv", h.UploadCV)
 
 		r.Get("/stats", h.Stats)
 		r.Get("/statuses", h.Statuses)
@@ -63,12 +71,28 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 	// behind the n8n key means a leaked app token can't inject rows into the
 	// jobs table.
 	r.Group(func(r chi.Router) {
+		r.Use(chimw.Timeout(cfg.Timeout))
 		r.Use(middleware.Auth(cfg))
 		r.Use(middleware.RequireRole(middleware.RoleN8N))
 
 		r.Post("/internal/jobs/ingest", h.Ingest)
-		r.Post("/internal/scoring/run", h.RunScoring)
 		r.Post("/internal/errors", h.RecordError)
+	})
+
+	// ---- n8n only, long-running ----
+	// Scoring is a sibling group rather than nested inside the one above, so it
+	// gets ScoringTimeout INSTEAD of the standard one. It makes a model call per
+	// job, sequentially, and a batch of 10 legitimately takes minutes.
+	//
+	// This bit us: with a 30s deadline the request context died mid-batch, and
+	// the remaining jobs were written off as ScoreFailed — a timeout presenting
+	// as "the model returned garbage".
+	r.Group(func(r chi.Router) {
+		r.Use(chimw.Timeout(cfg.ScoringTimeout))
+		r.Use(middleware.Auth(cfg))
+		r.Use(middleware.RequireRole(middleware.RoleN8N))
+
+		r.Post("/internal/scoring/run", h.RunScoring)
 	})
 
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {

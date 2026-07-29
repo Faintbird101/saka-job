@@ -5,9 +5,7 @@ Only Caddy is exposed to the host. Everything else is internal.
 
     host :7080/:7443  ->  Caddy  ->  api.sakajob.home  ->  backend:8080
                                  ->  n8n.sakajob.home  ->  n8n:5678
-                                 ->  hub.sakajob.home  ->  beszel:8090
                           postgres      (internal only, no host port)
-                          beszel-agent  (host network, collects metrics)
 
 ## Ports: why 7080/7443, not 80/443
 
@@ -35,15 +33,10 @@ are fiddly about it; on its own hostname each app is simply at `/`.
 |----------------------------------|--------------------|
 | `https://api.sakajob.home:7443`  | backend API (at `/`) |
 | `https://n8n.sakajob.home:7443`  | n8n editor         |
-| `https://hub.sakajob.home:7443`  | beszel monitoring  |
 | `https://localhost:7443/api/…`   | API fallback, path-prefixed |
 | `https://localhost:7444`         | n8n fallback |
-| `https://localhost:7445`         | monitoring fallback |
 
-**Beszel's admin UI is at `/_/`** (it is PocketBase underneath) — the root
-serves the dashboard SPA. The `beszel-agent` container exits until you register
-an agent in that UI and put its key in `.env` as `BESZEL_AGENT_KEY`; that is
-expected, not a fault.
+
 
 **These names need a hosts-file entry to resolve** — already added on this
 machine. To reproduce elsewhere, append to
@@ -59,8 +52,7 @@ Folder Access, but a plain shell append works. Verify with
 `ping api.sakajob.home` — it should answer from `127.0.0.1`.
 
 Fallbacks are kept for a machine without the entries: the API at
-`https://localhost:7443/api/…`, n8n at `https://localhost:7444`, monitoring at
-`https://localhost:7445`. You can also test hostname routing without the hosts
+`https://localhost:7443/api/…` and n8n at `https://localhost:7444`. You can also test hostname routing without the hosts
 file at all:
 
     curl -k --resolve api.sakajob.home:7443:127.0.0.1 https://api.sakajob.home:7443/health
@@ -80,8 +72,7 @@ stays under `/api/` (`/api/jobs`).
 3. Add the hosts entries above (once, as Administrator).
 4. Backend API:  `https://api.sakajob.home:7443/health`
 5. n8n UI:       `https://n8n.sakajob.home:7443`
-6. Monitoring:   `https://hub.sakajob.home:7443` (register the agent, put its
-   key in `.env` as `BESZEL_AGENT_KEY`, then `docker compose up -d beszel-agent`)
+6. Monitoring: nothing to do — see "Monitoring" below.
 
 ## HTTPS notes
 - Dev uses Caddy's internal CA (`tls internal`) — real HTTPS, self-signed, so
@@ -102,9 +93,37 @@ add `ports: ["5432:5432"]` to the postgres service, or exec into the container:
 
     docker compose exec postgres psql -U jobhunter -d jobhunter
 
-## Beszel scope
-System/resource monitoring only (CPU, RAM, disk, container stats). App-level
-errors still go to the `errors` table + the n8n error-trigger workflow.
+## Monitoring
+
+**There is no beszel service in this stack.** Another project on this machine
+runs a Beszel hub *and* an agent with `/var/run/docker.sock` mounted. Because
+that is the same Docker daemon, JobHunter's containers already appear in that
+hub with no configuration at all — a second agent would report identical stats
+on a second port.
+
+If you move this stack to a host that is *not* already monitored, add:
+
+```yaml
+  beszel-agent:
+    image: henrygd/beszel-agent:latest
+    network_mode: host
+    restart: unless-stopped
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock:ro"]
+    environment:
+      LISTEN: "45876"
+      KEY: "${BESZEL_AGENT_KEY}"
+```
+
+Then in the hub UI: **Add System** → name it, host = the agent host's address
+reachable *from the hub* (`host.docker.internal` if the hub is a container on
+the same machine, otherwise the LAN IP), port `45876`. Copy the public key it
+shows into `.env` as `BESZEL_AGENT_KEY` and `docker compose up -d beszel-agent`.
+Until the key is set the agent exits with "no key provided" — expected, not a
+fault.
+
+Beszel covers system/resource health only. Application errors go to the
+`errors` table and surface via `GET /errors` and `GET /stats`.
+
 
 ## n8n restart durability
 For workflows that wait, run n8n with persisted execution mode + the mounted

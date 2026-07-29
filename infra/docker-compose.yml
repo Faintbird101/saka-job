@@ -1,4 +1,10 @@
 # ============================================================
+#  Monitoring note: there is no beszel service here at all. Another project on
+#  this machine runs a Beszel hub AND an agent with /var/run/docker.sock
+#  mounted, and because that is the same Docker daemon, JobHunter's containers
+#  already appear in that hub with no configuration. A second agent would
+#  report identical stats on a second port.
+#
 #  Full local stack. Caddy is the ONLY thing exposed to the
 #  host (7080/7443). backend, n8n, postgres, beszel are reachable
 #  only on the internal Docker network — that is the hardening.
@@ -23,7 +29,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddydata:/data
       - caddyconfig:/config
-    depends_on: [backend, n8n, beszel]
+    depends_on: [backend, n8n]
 
   postgres:
     image: postgres:16
@@ -59,26 +65,8 @@ services:
     volumes: ["n8ndata:/home/node/.n8n"]
     depends_on: [postgres]
 
-  # --- Beszel monitoring: hub (dashboard) + agent (metrics collector) ---
-  beszel:
-    image: henrygd/beszel:latest
-    expose: ["8090"]
-    volumes: ["beszeldata:/beszel_data"]
-
-  beszel-agent:
-    image: henrygd/beszel-agent:latest
-    network_mode: host          # agent needs host visibility for real stats
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      # PORT + KEY are set after you register the agent in the Beszel UI.
-      PORT: "45876"
-      KEY: "${BESZEL_AGENT_KEY:-}"
-    depends_on: [beszel]
-
 volumes:
   pgdata:
   n8ndata:
   caddydata:
   caddyconfig:
-  beszeldata:

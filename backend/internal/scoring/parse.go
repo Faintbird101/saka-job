@@ -21,6 +21,13 @@ type Result struct {
 // indistinguishable from a genuine "terrible match" once it is in the table.
 var ErrUnparseable = errors.New("model reply could not be parsed as a score")
 
+// ErrRateLimited means the provider refused because of a quota or rate limit.
+//
+// It is deliberately NOT an ErrUnparseable: nothing is wrong with the job or
+// the prompt, and marking the row ScoreFailed would be a lie. The caller should
+// stop the batch and leave the remaining jobs in New for the next run.
+var ErrRateLimited = errors.New("provider rate limit or quota exceeded")
+
 // maxSummary caps the stored summary. The prompt asks for under 300
 // characters; this enforces it rather than trusting it.
 const maxSummary = 500

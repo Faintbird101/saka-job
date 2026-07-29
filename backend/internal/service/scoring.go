@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/yourname/jobhunter/backend/internal/db/queries"
 	"github.com/yourname/jobhunter/backend/internal/models"
@@ -14,13 +15,20 @@ import (
 
 // ScoreRun is the outcome of one WF-B pass.
 type ScoreRun struct {
-	Considered int      `json:"considered"`
-	Scored     int      `json:"scored"`
-	LowMatch   int      `json:"low_match"`
-	Failed     int      `json:"failed"`
-	Threshold  int      `json:"threshold"`
-	Scorer     string   `json:"scorer"`
-	JobIDs     []string `json:"job_ids"`
+	Considered int    `json:"considered"`
+	Scored     int    `json:"scored"`
+	LowMatch   int    `json:"low_match"`
+	Failed     int    `json:"failed"`
+	Threshold  int    `json:"threshold"`
+	Scorer     string `json:"scorer"`
+	// Interrupted reports that the run stopped early. The unscored jobs are
+	// still in `New`, so the next run continues rather than losing them.
+	Interrupted bool `json:"interrupted,omitempty"`
+	// RateLimited distinguishes "the provider throttled us" from other early
+	// exits. On a free tier this is a normal outcome, not a failure: the batch
+	// simply resumes on the next scheduled run.
+	RateLimited bool     `json:"rate_limited,omitempty"`
+	JobIDs      []string `json:"job_ids"`
 }
 
 // DefaultScoreBatch bounds one run when the caller doesn't say.
@@ -83,7 +91,32 @@ func (s *Service) ScoreNewJobs(ctx context.Context, limit int) (ScoreRun, error)
 	}
 
 	for _, job := range jobs {
+		// Stop cleanly if the request is going away (timeout, client hang-up,
+		// shutdown). Continuing would mark every remaining job ScoreFailed for
+		// a reason that has nothing to do with the job — the rows stay in `New`
+		// and the next run picks them up instead.
+		if err := ctx.Err(); err != nil {
+			s.log.Warn("scoring run cut short",
+				"reason", err, "scored_so_far", run.Scored+run.LowMatch,
+				"remaining", run.Considered-(run.Scored+run.LowMatch+run.Failed))
+			run.Interrupted = true
+			break
+		}
+
 		status, err := s.scoreOne(ctx, profile, job)
+
+		// A rate limit is transient and affects every remaining call in the
+		// window, so stop rather than burning through the rest of the batch
+		// marking jobs ScoreFailed for a reason that is not their fault. They
+		// stay in New and the next scheduled run continues.
+		if errors.Is(err, scoring.ErrRateLimited) {
+			s.log.Warn("provider rate limit reached, ending run early",
+				"scored_so_far", run.Scored+run.LowMatch, "error", err)
+			run.Interrupted = true
+			run.RateLimited = true
+			break
+		}
+
 		switch {
 		case err != nil:
 			run.Failed++
@@ -117,14 +150,28 @@ func (s *Service) scoreOne(ctx context.Context, profile models.Profile, job mode
 		return s.applyScore(ctx, profile, job, result, audit)
 	}
 
+	// A rate limit leaves the row untouched: it is a provider condition, not a
+	// property of this job, and ScoreFailed would misattribute it.
+	if errors.Is(err, scoring.ErrRateLimited) {
+		return "", err
+	}
+
 	// Either the call or the parse failed. Park the job so the next run can
 	// retry it, and record why — an unexplained ScoreFailed row is useless
 	// when you come back to it a day later.
 	s.log.Warn("marking job ScoreFailed", "job_id", job.ID, "error", err)
-	s.LogError(ctx, "WF-B", &job.ID, fmt.Sprintf("scoring failed: %v", err), nil)
+
+	// Detach from the request context for the bookkeeping writes. If the reason
+	// for failing was the context itself, using it again loses the explanation
+	// and the status update — which is how a timeout became a silent
+	// ScoreFailed with nothing in the errors table.
+	writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+
+	s.LogError(writeCtx, "WF-B", &job.ID, fmt.Sprintf("scoring failed: %v", err), nil)
 
 	failed := models.StatusScoreFailed
-	if _, uerr := s.UpdateJob(ctx, job.ID, models.JobUpdate{Status: &failed}); uerr != nil {
+	if _, uerr := s.UpdateJob(writeCtx, job.ID, models.JobUpdate{Status: &failed}); uerr != nil {
 		return "", fmt.Errorf("scoring failed (%v) and the status update also failed: %w", err, uerr)
 	}
 	return failed, err

@@ -349,7 +349,6 @@ network.
 ```
 host :7080/:7443 -> Caddy -+-> api.sakajob.home  backend:8080
                            +-> n8n.sakajob.home  n8n:5678
-                           +-> hub.sakajob.home  beszel:8090
                  postgres      (internal only — no host port)
                  beszel-agent  (host network, collects metrics)
 ```
@@ -395,12 +394,10 @@ docker compose up -d
 # 4. Add the local hostnames (once, as Administrator) — see infra/README.md:
 #      127.0.0.1  api.sakajob.home
 #      127.0.0.1  n8n.sakajob.home
-#      127.0.0.1  hub.sakajob.home
 
 # 5. Reach the services (self-signed cert in dev, so use -k with curl):
 #    Backend API:  https://api.sakajob.home:7443/...
-#    n8n UI:       https://n8n.sakajob.home:7443
-#    Monitoring:   https://hub.sakajob.home:7443
+#    n8n UI:       https://n8n.sakajob.home:7443  (or https://localhost:7444)
 #
 #    The edge is on 7080/7443, not 80/443 — those are commonly taken, and on
 #    this machine another stack holds them. Without the hosts entries above,
@@ -418,10 +415,11 @@ flutter pub get
 flutter run
 ```
 
-### Beszel agent
-After first boot, open `https://hub.sakajob.home:7443`, register the agent, copy
-its key into `.env` as `BESZEL_AGENT_KEY`, then
-`docker compose up -d beszel-agent`.
+### Monitoring
+No beszel service runs in this stack. Another project on this machine already
+runs a Beszel hub and an agent with `/var/run/docker.sock` mounted; since that
+is the same Docker daemon, JobHunter's containers appear there with no
+configuration. See `infra/README.md` if you move to an unmonitored host.
 
 ---
 
@@ -449,8 +447,11 @@ the way through — then widened. Recommended order:
    work only: list ingested jobs from `GET /jobs`.
 6. [done] **Scoring** (WF-B + `/internal/scoring/run`). Two interchangeable
    scorers behind one interface, selected by `SCORING_MODE`: `keyword`
-   (deterministic overlap — free, no API key, the default) and `llm` (a model
-   call, better judgement, needs credits). Set your CV at `/profile/edit`. Note the source API returns no job
+   (deterministic overlap — free, unlimited, the default) and `llm` (a model
+   call, better judgement). LLM supports Gemini and Anthropic via
+   `LLM_PROVIDER`. Note Gemini's free tier is only ~20 requests/day *per
+   model*, which is why keyword is the default for routine runs. Upload your CV
+   (PDF/DOCX/TXT) at `/profile/edit`. Note the source API returns no job
    description on our plan, so scoring runs on the AI-extracted fields
    (`ai_key_skills`, `ai_keywords`, `ai_requirements_summary`) — which is the
    cost-saving path this README already argued for.

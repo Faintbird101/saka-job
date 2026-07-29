@@ -54,6 +54,13 @@
   .skills { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
   .chip { background: var(--bg); border: 1px solid var(--line); border-radius: 999px;
           padding: .15rem .6rem; font-size: .8rem; color: var(--dim); }
+  .drop { border: 1.5px dashed var(--line); border-radius: 9px; padding: 1.1rem;
+          text-align: center; margin-bottom: .8rem; transition: border-color .15s, background .15s; }
+  .drop.over { border-color: var(--accent); background: rgba(110,168,254,.07); }
+  .drop.busy { opacity: .6; }
+  button.link { background: none; border: 0; color: var(--accent); padding: 0;
+                font: inherit; text-decoration: underline; cursor: pointer; }
+  #filemsg { font-size: .85rem; margin-top: .5rem; }
 </style>
 </head>
 <body>
@@ -74,8 +81,16 @@
 
   <fieldset>
     <legend>Master CV</legend>
-    <div class="hint">Plain text. Skills are matched against this, so make sure the technologies you actually know appear by name — "Flutter", "Dart", "Go", "PostgreSQL". Formatting is irrelevant; content is what matters.</div>
-    <textarea id="master_cv" spellcheck="false" placeholder="Paste your CV here…"></textarea>
+    <div class="hint">Upload a PDF or Word file, or paste the text. Skills are matched against this, so make sure the technologies you actually know appear by name — "Flutter", "Dart", "Go", "PostgreSQL". Formatting is irrelevant; content is what matters.</div>
+
+    <div id="drop" class="drop">
+      <input id="file" type="file" accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" hidden>
+      <strong>Drop a CV here</strong> or <button id="pick" class="link" type="button">choose a file</button>
+      <div class="hint" style="margin:.35rem 0 0">PDF, DOCX, or TXT — up to 10&nbsp;MB. The text is extracted here in the browser's request to your own backend; nothing is sent to any third party.</div>
+      <div id="filemsg"></div>
+    </div>
+
+    <textarea id="master_cv" spellcheck="false" placeholder="…or paste your CV here"></textarea>
     <div class="counter"><span id="cv_count">0</span> characters</div>
   </fieldset>
 
@@ -215,6 +230,60 @@
         $("save").disabled = false;
       });
   }
+
+  function upload(f) {
+    if (!f) { return; }
+    var t = $("token").value.trim();
+    if (!t) { say($("filemsg"), "Enter the app token first.", "warn"); return; }
+
+    var drop = $("drop");
+    drop.classList.add("busy");
+    say($("filemsg"), "Reading " + f.name + "…", "");
+
+    var body = new FormData();
+    body.append("file", f);
+
+    // No Content-Type header: the browser must set the multipart boundary.
+    fetch(API + "/profile/cv", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + t },
+      body: body
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          if (!r.ok) { throw new Error((b.error && b.error.message) || ("HTTP " + r.status)); }
+          return b;
+        });
+      })
+      .then(function (b) {
+        $("master_cv").value = b.text;
+        countCV();
+        $("save").disabled = false;
+        say($("filemsg"),
+          "Extracted " + b.chars.toLocaleString() + " characters from " + b.filename +
+          " — check it below, then Save.", "ok");
+      })
+      .catch(function (e) { say($("filemsg"), e.message, "bad"); })
+      .then(function () { drop.classList.remove("busy"); });
+  }
+
+  var drop = $("drop");
+  $("pick").addEventListener("click", function () { $("file").click(); });
+  $("file").addEventListener("change", function (e) { upload(e.target.files[0]); });
+
+  ["dragenter", "dragover"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) {
+      e.preventDefault(); drop.classList.add("over");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) {
+      e.preventDefault(); drop.classList.remove("over");
+    });
+  });
+  drop.addEventListener("drop", function (e) {
+    if (e.dataTransfer && e.dataTransfer.files.length) { upload(e.dataTransfer.files[0]); }
+  });
 
   $("load").addEventListener("click", load);
   $("save").addEventListener("click", save);

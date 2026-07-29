@@ -24,6 +24,10 @@ type Config struct {
 	LogLevel  string        // debug | info | warn | error
 	LogFormat string        // json | text
 	Timeout   time.Duration // per-request handler timeout
+	// ScoringTimeout bounds /internal/scoring/run separately. Scoring is one
+	// model call per job, sequentially, so a batch legitimately takes minutes —
+	// far longer than any other endpoint should be allowed to take.
+	ScoringTimeout time.Duration
 
 	// Postgres
 	DatabaseURL string
@@ -38,6 +42,9 @@ type Config struct {
 	RapidAPIHost string
 	LLMAPIKey    string
 	LLMModel     string
+	// LLMProvider is "gemini" (default) or "anthropic". Only consulted when
+	// ScoringMode is "llm".
+	LLMProvider string
 	// ScoringMode selects the scorer: "keyword" (default, free, no key) or
 	// "llm" (needs LLMAPIKey). See internal/scoring.
 	ScoringMode string
@@ -77,6 +84,7 @@ func Load() (Config, error) {
 		RapidAPIKey:  os.Getenv("RAPIDAPI_KEY"),
 		RapidAPIHost: os.Getenv("RAPIDAPI_HOST"),
 		ScoringMode:  strings.ToLower(getDefault("SCORING_MODE", "keyword")),
+		LLMProvider:  strings.ToLower(getDefault("LLM_PROVIDER", "gemini")),
 		LLMAPIKey:    os.Getenv("LLM_API_KEY"),
 		LLMModel:     os.Getenv("LLM_MODEL"),
 		SMTPHost:     os.Getenv("SMTP_HOST"),
@@ -89,6 +97,12 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("REQUEST_TIMEOUT_SECONDS must be a positive integer, got %q", os.Getenv("REQUEST_TIMEOUT_SECONDS"))
 	}
 	c.Timeout = time.Duration(secs) * time.Second
+
+	ssecs, err := strconv.Atoi(getDefault("SCORING_TIMEOUT_SECONDS", "900"))
+	if err != nil || ssecs <= 0 {
+		return Config{}, fmt.Errorf("SCORING_TIMEOUT_SECONDS must be a positive integer, got %q", os.Getenv("SCORING_TIMEOUT_SECONDS"))
+	}
+	c.ScoringTimeout = time.Duration(ssecs) * time.Second
 
 	if p := strings.TrimSpace(os.Getenv("SMTP_PORT")); p != "" {
 		n, err := strconv.Atoi(p)
