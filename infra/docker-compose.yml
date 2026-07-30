@@ -61,8 +61,22 @@ services:
       # and https://localhost:7444 (fallback). N8N_HOST is left unset so n8n
       # accepts whichever of the two you use rather than rejecting one.
       WEBHOOK_URL: https://n8n.sakajob.home:7443/
+      # Trust one extra CA on top of the system store.
+      #
+      # Needed on a machine running TLS-inspecting antivirus (Avast Web/Mail
+      # Shield here): it terminates the connection to smtp.gmail.com and
+      # re-signs it with its own root, which Node does not trust, so the SMTP
+      # credential fails with "self-signed certificate in certificate chain".
+      # Trusting that single root is far better than switching off certificate
+      # verification wholesale.
+      #
+      # If the file is absent Node logs a warning and carries on, so this is
+      # harmless on hosts without such software. See infra/certs/README.md.
+      NODE_EXTRA_CA_CERTS: /opt/extra-certs/extra-ca.crt
     expose: ["5678"]
-    volumes: ["n8ndata:/home/node/.n8n"]
+    volumes:
+      - n8ndata:/home/node/.n8n
+      - ./certs:/opt/extra-certs:ro
     depends_on: [postgres]
 
 volumes:

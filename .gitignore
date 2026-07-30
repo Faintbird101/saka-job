@@ -19,3 +19,6 @@ mobile/.packages
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Machine-specific CA certs for TLS-inspecting antivirus (see infra/certs/README.md)
+infra/certs/*.crt
