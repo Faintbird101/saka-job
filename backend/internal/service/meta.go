@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/yourname/jobhunter/backend/internal/db/queries"
 	"github.com/yourname/jobhunter/backend/internal/models"
 )
@@ -21,7 +22,9 @@ func (s *Service) GetProfile(ctx context.Context) (models.Profile, error) {
 
 	err := s.db.Pool.QueryRow(ctx, queries.GetProfile).Scan(
 		&p.MasterCV, &titles, &skills,
-		&p.MinScoreThreshold, &p.MaxJobsPerRun, &p.UpdatedAt,
+		&p.MinScoreThreshold, &p.MaxJobsPerRun,
+		&p.ScoringModel, &p.GenerationModel, &p.CoverLetterNotes,
+		&p.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// 0001_init.sql seeds id=1, so this means the row was deleted by hand.
@@ -65,7 +68,11 @@ func (s *Service) UpdateProfile(ctx context.Context, patch models.ProfileUpdate)
 		rawOrNil(patch.PreferredSkills),
 		patch.MinScoreThreshold,
 		patch.MaxJobsPerRun,
-	).Scan(&p.MasterCV, &titles, &skills, &p.MinScoreThreshold, &p.MaxJobsPerRun, &p.UpdatedAt)
+		patch.ScoringModel,
+		patch.GenerationModel,
+		patch.CoverLetterNotes,
+	).Scan(&p.MasterCV, &titles, &skills, &p.MinScoreThreshold, &p.MaxJobsPerRun,
+		&p.ScoringModel, &p.GenerationModel, &p.CoverLetterNotes, &p.UpdatedAt)
 	if err != nil {
 		return models.Profile{}, fmt.Errorf("update profile: %w", err)
 	}
@@ -230,4 +237,23 @@ func (s *Service) Stats(ctx context.Context) (models.Stats, error) {
 	}
 
 	return out, nil
+}
+
+// ClearErrors empties the application error log and reports how many rows went.
+//
+// The 24-hour error count on the dashboard is only meaningful if resolved
+// noise can be cleared; otherwise a burst of failures from one bad afternoon
+// makes the badge permanently red and you stop looking at it.
+func (s *Service) ClearErrors(ctx context.Context, olderThan *time.Time) (int64, error) {
+	var tag pgconn.CommandTag
+	var err error
+	if olderThan != nil {
+		tag, err = s.db.Pool.Exec(ctx, queries.ClearErrorsBefore, *olderThan)
+	} else {
+		tag, err = s.db.Pool.Exec(ctx, queries.ClearErrors)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("clear errors: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }

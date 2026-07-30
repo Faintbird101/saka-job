@@ -47,6 +47,20 @@ func buildScorer(cfg config.Config, log *slog.Logger) scoring.Scorer {
 	return scoring.NewKeywordScorer()
 }
 
+// buildLLM constructs the model client if a usable key is configured. A nil
+// return is a supported state: the API still serves everything else, and only
+// generation reports itself unavailable.
+func buildLLM(cfg config.Config, log *slog.Logger) (scoring.Client, string) {
+	client, model, err := scoring.NewLLMClient(
+		scoring.Provider(cfg.LLMProvider), cfg.LLMAPIKey, cfg.LLMModel)
+	if err != nil {
+		log.Warn("LLM features disabled (generation will report unavailable)", "reason", err)
+		return nil, ""
+	}
+	log.Info("LLM client ready", "provider", cfg.LLMProvider, "model", model)
+	return client, model
+}
+
 // run does the real work and returns an error, so every failure path gets the
 // same treatment and deferred cleanup actually runs (os.Exit in main would
 // skip it).
@@ -80,7 +94,12 @@ func run() error {
 	// mode needs a key, and if it is missing we degrade to no scorer rather
 	// than refusing to boot — the rest of the API must keep serving.
 	scorer := buildScorer(cfg, log)
-	svc := service.New(database, log, scorer)
+
+	// The model client is built regardless of SCORING_MODE, because generation
+	// (WF-C) needs one even when scoring deliberately does not use one.
+	llm, llmModel := buildLLM(cfg, log)
+
+	svc := service.New(database, log, scorer, llm, llmModel)
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: handlers.Router(cfg, database, svc, log),

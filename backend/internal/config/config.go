@@ -72,7 +72,7 @@ func Load() (Config, error) {
 
 	c := Config{
 		Env:       getDefault("APP_ENV", "dev"),
-		Port:      getDefault("API_PORT", "8080"),
+		Port:      getDefault("API_PORT", "2623"),
 		LogLevel:  getDefault("LOG_LEVEL", "info"),
 		LogFormat: getDefault("LOG_FORMAT", "json"),
 

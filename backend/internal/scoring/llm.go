@@ -26,7 +26,9 @@ func (l *LLMScorer) Name() string { return "llm:" + l.model }
 
 // Score builds the prompt, calls the model, and validates the reply.
 func (l *LLMScorer) Score(ctx context.Context, p models.Profile, j models.Job) (Result, error) {
-	reply, err := l.client.Complete(ctx, SystemPrompt(), BuildUserPrompt(p, j))
+	// The profile can override the model per stage; empty falls back to the
+	// configured default.
+	reply, err := l.client.Complete(ctx, p.ScoringModel, SystemPrompt(), BuildUserPrompt(p, j))
 	if err != nil {
 		return Result{}, err
 	}
@@ -39,3 +41,10 @@ func (l *LLMScorer) Score(ctx context.Context, p models.Profile, j models.Job) (
 func (l *LLMScorer) Prompt(p models.Profile, j models.Job) string {
 	return BuildUserPrompt(p, j)
 }
+
+// Client exposes the model client so other stages (generation) can reuse the
+// same configured provider and key rather than constructing a second one.
+func (l *LLMScorer) Client() Client { return l.client }
+
+// DefaultModel reports the fallback model id.
+func (l *LLMScorer) DefaultModel() string { return l.model }

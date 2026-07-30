@@ -11,6 +11,9 @@ SELECT
     COALESCE(preferred_skills, '[]'::jsonb),
     min_score_threshold,
     max_jobs_per_run,
+    COALESCE(scoring_model, ''),
+    COALESCE(generation_model, ''),
+    COALESCE(cover_letter_notes, ''),
     updated_at
 FROM profile
 WHERE id = 1`
@@ -23,7 +26,10 @@ UPDATE profile SET
     search_titles       = COALESCE($2, search_titles),
     preferred_skills    = COALESCE($3, preferred_skills),
     min_score_threshold = COALESCE($4, min_score_threshold),
-    max_jobs_per_run    = COALESCE($5, max_jobs_per_run)
+    max_jobs_per_run    = COALESCE($5, max_jobs_per_run),
+    scoring_model       = COALESCE($6, scoring_model),
+    generation_model    = COALESCE($7, generation_model),
+    cover_letter_notes  = COALESCE($8, cover_letter_notes)
 WHERE id = 1
 RETURNING
     COALESCE(master_cv, ''),
@@ -31,6 +37,9 @@ RETURNING
     COALESCE(preferred_skills, '[]'::jsonb),
     min_score_threshold,
     max_jobs_per_run,
+    COALESCE(scoring_model, ''),
+    COALESCE(generation_model, ''),
+    COALESCE(cover_letter_notes, ''),
     updated_at`
 
 // ---------- fetch_log (API quota visibility) ----------
@@ -92,3 +101,10 @@ LIMIT $1`
 
 // CountRecentErrors is the 24-hour error badge on the dashboard.
 const CountRecentErrors = `SELECT count(*) FROM errors WHERE created_at > now() - interval '24 hours'`
+
+// ClearErrors empties the application error log. The dashboard's 24-hour count
+// is only useful if stale noise can be cleared out after it has been dealt with.
+const ClearErrors = `DELETE FROM errors`
+
+// ClearErrorsBefore removes entries older than a cutoff, for routine pruning.
+const ClearErrorsBefore = `DELETE FROM errors WHERE created_at < $1`

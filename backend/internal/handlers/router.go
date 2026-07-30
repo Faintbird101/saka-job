@@ -49,6 +49,10 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 
 		r.Get("/jobs", h.ListJobs)
 		r.Get("/jobs/{id}", h.GetJob)
+		// Generated documents, served as markdown rather than wrapped in JSON —
+		// they are prose meant to be read and edited.
+		r.Get("/jobs/{id}/cv", h.GetCV)
+		r.Get("/jobs/{id}/cover-letter", h.GetCoverLetter)
 		// PATCH is shared on purpose: the app writes Approved/Rejected here and
 		// n8n writes score and CV URLs through the same validated path, so the
 		// state machine is enforced once rather than twice.
@@ -64,6 +68,11 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 		r.Get("/statuses", h.Statuses)
 		r.Get("/fetch-logs", h.ListFetchLogs)
 		r.Get("/errors", h.ListErrors)
+		// Pruning matters: a permanently red error badge is one nobody reads.
+		r.Delete("/errors", h.ClearErrors)
+		// Re-run scoring for one job after tuning the CV, threshold, or weights,
+		// without resetting the whole table by hand.
+		r.Post("/jobs/{id}/rescore", h.RescoreJob)
 	})
 
 	// ---- n8n only ----
@@ -93,6 +102,9 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 		r.Use(middleware.RequireRole(middleware.RoleN8N))
 
 		r.Post("/internal/scoring/run", h.RunScoring)
+		// Generation is in the same long-running group: it writes two documents
+		// of prose per job, so it is slower per job than scoring.
+		r.Post("/internal/generation/run", h.RunGeneration)
 	})
 
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {

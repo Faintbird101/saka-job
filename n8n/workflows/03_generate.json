@@ -1,0 +1,125 @@
+{
+  "name": "WF-C Generate",
+  "id": "jobhunter-wf-c",
+  "active": false,
+  "versionId": "c3c3c3c3-0000-4000-8000-00000000c33d",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "timezone": "Africa/Nairobi"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "40 7,19 * * *" }
+          ]
+        }
+      },
+      "id": "c3000000-0000-4000-8000-000000000001",
+      "name": "After each scoring run",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-420, 0],
+      "notes": "40 minutes past, so it lands after WF-A (:00) and WF-B (:20) have finished. Like the others it is not chained: it picks up whatever is sitting in `Scored`, so a slow or failed upstream run costs it nothing."
+    },
+    {
+      "parameters": {},
+      "id": "c3000000-0000-4000-8000-000000000002",
+      "name": "Run now (manual)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-420, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:2623/internal/generation/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ limit: 3 }) }}",
+        "options": { "timeout": 900000 }
+      },
+      "id": "c3000000-0000-4000-8000-000000000003",
+      "name": "Generate documents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-160, 80],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      },
+      "notes": "The backend writes a tailored CV and a cover letter for each `Scored` job and walks it Scored -> CVGenerated -> AwaitingApproval. From there it waits for YOU: nothing sends without an explicit approval.\n\nlimit is 3, not 10. Generation is the most expensive stage — two documents of prose per job — and on a free tier metered per DAY a bigger batch would spend the whole allowance in one run. Raise it once you are on a paid key.\n\nThe model comes from profile.generation_model, so it is changeable from the app without touching this workflow or restarting anything.\n\nA 400 means no model is configured or master_cv is empty. Not retryable."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "problem-check",
+              "leftValue": "={{ $json.failed || 0 }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c3000000-0000-4000-8000-000000000004",
+      "name": "Any failures?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [120, 0],
+      "notes": "rate_limited is deliberately NOT treated as a failure: on a free tier it is the expected way a run ends, the untouched jobs stay in Scored, and the next run continues from there."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:2623/internal/errors",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: 'WF-C', message: ($json.failed !== undefined ? `${$json.failed} of ${$json.considered} jobs failed generation` : ($json.error?.message || 'generation run failed')), context: { execution_id: $execution.id, detail: $json } }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "c3000000-0000-4000-8000-000000000005",
+      "name": "Record problem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [380, 120],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      }
+    }
+  ],
+  "connections": {
+    "After each scoring run": {
+      "main": [[{ "node": "Generate documents", "type": "main", "index": 0 }]]
+    },
+    "Run now (manual)": {
+      "main": [[{ "node": "Generate documents", "type": "main", "index": 0 }]]
+    },
+    "Generate documents": {
+      "main": [
+        [{ "node": "Any failures?", "type": "main", "index": 0 }],
+        [{ "node": "Record problem", "type": "main", "index": 0 }]
+      ]
+    },
+    "Any failures?": {
+      "main": [
+        [{ "node": "Record problem", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "pinData": {}
+}

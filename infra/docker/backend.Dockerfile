@@ -28,5 +28,5 @@ FROM gcr.io/distroless/base-debian12
 USER nonroot:nonroot
 
 COPY --from=build /bin/api /bin/api
-EXPOSE 8080
+EXPOSE 2623
 ENTRYPOINT ["/bin/api"]

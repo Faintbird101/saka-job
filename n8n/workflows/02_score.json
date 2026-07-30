@@ -1,7 +1,8 @@
 {
   "name": "WF-B Score",
+  "id": "jobhunter-wf-b",
   "active": false,
-  "versionId": "b2b2b2b2-0000-4000-8000-00000000b22b",
+  "versionId": "b2b2b2b2-0000-4000-8000-00000000b22c",
   "settings": {
     "executionOrder": "v1",
     "saveManualExecutions": true,
@@ -36,7 +37,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://backend:8080/internal/scoring/run",
+        "url": "http://backend:2623/internal/scoring/run",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -81,7 +82,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://backend:8080/internal/errors",
+        "url": "http://backend:2623/internal/errors",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,

@@ -14,6 +14,7 @@ import (
 	"log/slog"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/yourname/jobhunter/backend/internal/db"
 	"github.com/yourname/jobhunter/backend/internal/models"
 	"github.com/yourname/jobhunter/backend/internal/scoring"
@@ -38,11 +39,21 @@ type Service struct {
 	// (llm mode with no key). The API still boots and serves everything else;
 	// only /internal/scoring/run reports itself unavailable.
 	scorer scoring.Scorer
+
+	// llm is the model client, built independently of the scoring mode.
+	//
+	// Generation always needs a model — there is no free substitute for writing
+	// prose — while scoring usually should not use one. Tying generation to
+	// SCORING_MODE would force you to pay for scoring just to get cover
+	// letters, so the two are deliberately separate: keyword scoring plus LLM
+	// generation is a supported, and probably the preferred, combination.
+	llm      scoring.Client
+	llmModel string
 }
 
-// New builds a Service. scorer may be nil.
-func New(database *db.DB, log *slog.Logger, scorer scoring.Scorer) *Service {
-	return &Service{db: database, log: log, scorer: scorer}
+// New builds a Service. scorer and llm may each be nil.
+func New(database *db.DB, log *slog.Logger, scorer scoring.Scorer, llm scoring.Client, llmModel string) *Service {
+	return &Service{db: database, log: log, scorer: scorer, llm: llm, llmModel: llmModel}
 }
 
 // row is the subset of pgx.Row / pgx.Rows that scanJob needs, so the same
@@ -100,11 +111,13 @@ func scanJob(r row) (models.Job, error) {
 		&j.PromptUsed,
 		&j.DateApplied,
 		&j.EmailUsed,
+		&j.GeneratedAt,
+		&j.GeneratedBy,
 		&j.CreatedAt,
 		&j.UpdatedAt,
 	)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) || isBadUUID(err) {
 			return models.Job{}, ErrNotFound
 		}
 		return models.Job{}, fmt.Errorf("scan job: %w", err)
@@ -115,6 +128,17 @@ func scanJob(r row) (models.Job, error) {
 	j.MatchedSkills = jsonOr(matched, "[]")
 	j.MissingSkills = jsonOr(missing, "[]")
 	return j, nil
+}
+
+// isBadUUID reports whether an error is Postgres rejecting a malformed UUID.
+//
+// A job id that is not a UUID is a request for something that cannot exist, so
+// it is a 404 — not the 500 that an unmapped driver error would produce. The
+// check is on the SQLSTATE code (22P02, invalid_text_representation) rather
+// than the message text, which is localised and version-dependent.
+func isBadUUID(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "22P02"
 }
 
 // jsonOr guards against a NULL jsonb sneaking past a missing COALESCE and

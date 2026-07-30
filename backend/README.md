@@ -47,20 +47,30 @@ jobs table.
 Caddy proxies with `handle_path /api/*`, which **strips** the prefix. The app
 calls `/api/jobs`; this router sees `/jobs`.
 
-| Method | Path                     | Auth  | Purpose |
-|--------|--------------------------|-------|---------|
-| GET    | `/health`                | none  | liveness + DB reachability (503 when Postgres is down) |
-| GET    | `/jobs`                  | any   | list; filters `status`, `min_score`, `country`, `q`, `limit`, `offset` |
-| GET    | `/jobs/{id}`             | any   | one job, full description text |
-| PATCH  | `/jobs/{id}`             | any   | partial update; enforces the state machine |
-| GET    | `/profile`               | any   | the singleton settings row |
-| PATCH  | `/profile`               | any   | update settings |
-| GET    | `/stats`                 | any   | count per pipeline stage, last fetch, 24h error count |
-| GET    | `/statuses`              | any   | the state machine, so the app doesn't hardcode a second copy |
-| GET    | `/fetch-logs`            | any   | API quota consumption history |
-| GET    | `/errors`               | any   | application error feed |
-| POST   | `/internal/jobs/ingest`  | n8n   | **WF-A**: normalize a batch, dedup, insert, log the run |
-| POST   | `/internal/errors`       | n8n   | workflow error reporting |
+| Method | Path                        | Auth  | Purpose |
+|--------|-----------------------------|-------|---------|
+| GET    | `/health`                   | none  | liveness + DB reachability (503 when Postgres is down) |
+| GET    | `/profile/edit`             | none  | CV editor page (static shell, no data — see profile_page.go) |
+| GET    | `/jobs`                     | any   | list; filters `status`, `min_score`, `country`, `q`, `limit`, `offset` |
+| GET    | `/jobs/{id}`                | any   | one job, full description text |
+| PATCH  | `/jobs/{id}`                | any   | partial update; enforces the state machine |
+| POST   | `/jobs/{id}/rescore`        | any   | re-run scoring for one job after tuning |
+| GET    | `/jobs/{id}/cv`             | any   | generated CV (`text/markdown`) |
+| GET    | `/jobs/{id}/cover-letter`   | any   | generated cover letter (`text/markdown`) |
+| GET    | `/profile`                  | any   | the singleton settings row |
+| PATCH  | `/profile`                  | any   | update settings, incl. per-stage models |
+| POST   | `/profile/cv`               | any   | upload PDF/DOCX/TXT → extracted text (does **not** save) |
+| GET    | `/stats`                    | any   | count per pipeline stage, last fetch, 24h error count |
+| GET    | `/statuses`                 | any   | the state machine + legal transitions |
+| GET    | `/fetch-logs`               | any   | API quota consumption history |
+| GET    | `/errors`                   | any   | application error feed |
+| DELETE | `/errors`                   | any   | prune the log; `?older_than_hours=N` |
+| POST   | `/internal/jobs/ingest`     | n8n   | **WF-A**: normalize a batch, dedup, insert, log the run |
+| POST   | `/internal/scoring/run`     | n8n   | **WF-B**: score `New` jobs → `Scored`/`LowMatch` |
+| POST   | `/internal/generation/run`  | n8n   | **WF-C**: `Scored` → CV + letter → `AwaitingApproval` |
+| POST   | `/internal/errors`          | n8n   | workflow error reporting |
+
+Twenty routes. `any` means either credential; `n8n` means the n8n key only.
 
 ### Ingest
 

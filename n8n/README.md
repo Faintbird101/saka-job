@@ -51,7 +51,7 @@ credentials, and it is what stops a leaked phone token from injecting rows into
 the jobs table.
 
 Nothing else is needed to "give access": the backend authorises purely on that
-header, and n8n reaches it at `http://backend:8080` over the internal Docker
+header, and n8n reaches it at `http://backend:2623` over the internal Docker
 network (already verified working), never through Caddy.
 
 ### 3. Import the workflow
@@ -103,7 +103,7 @@ place the rate-limit cap is defined.
 
 **Backend URLs have no `/api` prefix.** That prefix belongs to Caddy, which
 strips it before forwarding. These calls go direct over the internal Docker
-network to `http://backend:8080`, so they must use the unprefixed path.
+network to `http://backend:2623`, so they must use the unprefixed path.
 
 **One search at a time.** The loop's batch size of 1 serialises calls to a
 rate-limited endpoint, and keeps each search's results paired with its own

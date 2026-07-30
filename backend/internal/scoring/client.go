@@ -16,7 +16,11 @@ import (
 // the network lives — which is what lets the prompt and parsing logic be
 // tested without an API key.
 type Client interface {
-	Complete(ctx context.Context, system, user string) (string, error)
+	// Complete runs one request. model is resolved per call rather than fixed
+	// at construction, because scoring and generation can use different models
+	// — and on providers that meter free quota per model, that doubles the
+	// daily allowance instead of sharing one.
+	Complete(ctx context.Context, model, system, user string) (string, error)
 }
 
 // DefaultModel is used when LLM_MODEL is unset.
@@ -73,9 +77,12 @@ func NewAnthropicClient(apiKey, model string) (*AnthropicClient, error) {
 func (c *AnthropicClient) Model() string { return c.model }
 
 // Complete sends one scoring request and returns the reply text.
-func (c *AnthropicClient) Complete(ctx context.Context, system, user string) (string, error) {
+func (c *AnthropicClient) Complete(ctx context.Context, model, system, user string) (string, error) {
+	if model == "" {
+		model = c.model
+	}
 	resp, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.Model(c.model),
+		Model:     anthropic.Model(model),
 		MaxTokens: maxTokens,
 		System: []anthropic.TextBlockParam{{
 			Text: system,

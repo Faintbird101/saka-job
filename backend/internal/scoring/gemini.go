@@ -91,6 +91,27 @@ func NewGeminiClient(apiKey, model string) (*GeminiClient, error) {
 // Model reports the model id in use, for the audit trail.
 func (g *GeminiClient) Model() string { return g.model }
 
+// genConfig picks the generation settings for a request.
+//
+// Scoring wants a strict JSON object at temperature 0, so the reply is
+// machine-readable and reproducible. Generation wants prose, where forcing a
+// JSON schema would be actively harmful and a little warmth reads better.
+func genConfig(system string) map[string]any {
+	if strings.Contains(system, jsonContractMarker) {
+		return map[string]any{
+			"responseMimeType": "application/json",
+			"responseSchema":   responseSchema,
+			"temperature":      0,
+		}
+	}
+	return map[string]any{"temperature": 0.4}
+}
+
+// jsonContractMarker is a sentence unique to the scoring system prompt. Keying
+// off the prompt keeps the Client interface free of a mode flag that every
+// provider would have to thread through.
+const jsonContractMarker = "Return ONLY a JSON object"
+
 // responseSchema constrains the reply to exactly the shape Parse expects.
 //
 // This is the main practical advantage of Gemini here: the JSON is enforced
@@ -141,7 +162,10 @@ type geminiResponse struct {
 }
 
 // Complete sends one scoring request and returns the reply text.
-func (g *GeminiClient) Complete(ctx context.Context, system, user string) (string, error) {
+func (g *GeminiClient) Complete(ctx context.Context, model, system, user string) (string, error) {
+	if model == "" {
+		model = g.model
+	}
 	if err := g.wait(ctx); err != nil {
 		return "", err
 	}
@@ -149,17 +173,13 @@ func (g *GeminiClient) Complete(ctx context.Context, system, user string) (strin
 	body, err := json.Marshal(geminiRequest{
 		SystemInstruction: &geminiContent{Parts: []geminiPart{{Text: system}}},
 		Contents:          []geminiContent{{Role: "user", Parts: []geminiPart{{Text: user}}}},
-		GenerationConfig: map[string]any{
-			"responseMimeType": "application/json",
-			"responseSchema":   responseSchema,
-			"temperature":      0,
-		},
+		GenerationConfig:  genConfig(system),
 	})
 	if err != nil {
 		return "", fmt.Errorf("build gemini request: %w", err)
 	}
 
-	url := fmt.Sprintf(geminiEndpoint, g.model)
+	url := fmt.Sprintf(geminiEndpoint, model)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("build gemini request: %w", err)

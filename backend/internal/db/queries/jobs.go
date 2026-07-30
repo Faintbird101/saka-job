@@ -52,6 +52,8 @@ const JobColumns = `
     COALESCE(prompt_used, ''),
     date_applied,
     COALESCE(email_used, ''),
+    generated_at,
+    COALESCE(generated_by, ''),
     created_at,
     updated_at`
 
@@ -97,6 +99,8 @@ const ListJobColumns = `
     '' AS prompt_used,
     date_applied,
     COALESCE(email_used, ''),
+    generated_at,
+    COALESCE(generated_by, ''),
     created_at,
     updated_at`
 
@@ -208,3 +212,30 @@ FROM jobs
 WHERE status = $1
 ORDER BY created_at ASC
 LIMIT $2`
+
+// StoreDocuments writes the WF-C output.
+//
+// The *_url columns become paths into our own API rather than external links,
+// which keeps them meaningful now that the documents live in the row.
+const StoreDocuments = `
+UPDATE jobs SET
+    cv_text           = $2,
+    cover_letter_text = $3,
+    generated_by      = $4,
+    generated_at      = now(),
+    cv_url            = $5,
+    cover_letter_url  = $6
+WHERE id = $1`
+
+// GetDocuments reads the generated documents back.
+const GetDocuments = `
+SELECT COALESCE(cv_text, ''), COALESCE(cover_letter_text, ''), generated_at
+FROM jobs WHERE id = $1`
+
+// ForceStatus sets a status bypassing the transition graph. Only the rescore
+// path uses it; see service.forceStatus for why that exception exists.
+const ForceStatus = `
+UPDATE jobs SET status = $2, score = NULL, matched_skills = NULL,
+    missing_skills = NULL, ai_summary = NULL
+WHERE id = $1
+RETURNING ` + JobColumns

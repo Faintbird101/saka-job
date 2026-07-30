@@ -240,3 +240,58 @@ func (s *Service) jobsWithStatus(ctx context.Context, status string, limit int) 
 // ErrScoringUnavailable is returned when the handler is reached but no model
 // client was configured at boot.
 var ErrScoringUnavailable = errors.New("scoring is not configured")
+
+// RescoreJob re-runs scoring for a single job, whatever state it is in.
+//
+// This exists because tuning is iterative: after changing the CV, the
+// threshold, or the scorer weights, you want to see the effect on one specific
+// job without resetting the whole table by hand. It moves the job back to New
+// and scores it immediately.
+func (s *Service) RescoreJob(ctx context.Context, id string) (models.Job, error) {
+	if s.scorer == nil {
+		return models.Job{}, fmt.Errorf("%w: scoring is not configured", ErrInvalidInput)
+	}
+
+	profile, err := s.GetProfile(ctx)
+	if err != nil {
+		return models.Job{}, err
+	}
+	if strings.TrimSpace(profile.MasterCV) == "" {
+		return models.Job{}, fmt.Errorf("%w: profile.master_cv is empty", ErrInvalidInput)
+	}
+
+	job, err := s.GetJob(ctx, id)
+	if err != nil {
+		return models.Job{}, err
+	}
+
+	// Refuse past the approval gate. Re-scoring an Applied job would rewrite
+	// history for something already sent, and the transition back is illegal
+	// anyway — failing here gives a clearer reason than a 409 from the state
+	// machine three calls later.
+	switch job.Status {
+	case models.StatusApplied, models.StatusFollowUpSent, models.StatusClosed, models.StatusManualApply:
+		return models.Job{}, fmt.Errorf("%w: job is %s — re-scoring something already applied for would rewrite history",
+			ErrConflict, job.Status)
+	}
+
+	if _, err := s.forceStatus(ctx, id, models.StatusNew); err != nil {
+		return models.Job{}, err
+	}
+	job.Status = models.StatusNew
+
+	if _, err := s.scoreOne(ctx, profile, job); err != nil {
+		return models.Job{}, err
+	}
+	return s.GetJob(ctx, id)
+}
+
+// forceStatus sets a status without a transition check.
+//
+// It is used only by RescoreJob, to reset a job to New so it can be scored
+// again. Every other write goes through UpdateJob so the state machine stays
+// the single gatekeeper — this is the deliberate, narrow exception, and it is
+// why it is unexported.
+func (s *Service) forceStatus(ctx context.Context, id, status string) (models.Job, error) {
+	return scanJob(s.db.Pool.QueryRow(ctx, queries.ForceStatus, id, status))
+}

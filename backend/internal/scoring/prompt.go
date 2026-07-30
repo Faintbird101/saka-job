@@ -99,6 +99,13 @@ func writeField(b *strings.Builder, label, value string) {
 	fmt.Fprintf(b, "%s: %s\n", label, value)
 }
 
+// JSONList decodes a JSONB string array, tolerating null and malformed values
+// by returning nothing rather than failing the run. Exported so the generation
+// stage can reuse it rather than keeping a second copy in step with this one.
+func JSONList(raw json.RawMessage) []string {
+	return jsonList(raw)
+}
+
 // jsonList decodes a JSONB string array, tolerating null and malformed values
 // by returning nothing rather than failing the whole scoring run.
 func jsonList(raw json.RawMessage) []string {

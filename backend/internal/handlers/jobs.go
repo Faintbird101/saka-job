@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/yourname/jobhunter/backend/internal/ingest"
@@ -148,4 +149,69 @@ func (h *Handler) RunScoring(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.writeJSON(w, r, http.StatusOK, run)
+}
+
+// RunGeneration handles POST /internal/generation/run — WF-C's entry point.
+func (h *Handler) RunGeneration(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Limit int `json:"limit"`
+	}
+	if r.ContentLength > 0 {
+		if err := decodeJSON(w, r, &body); err != nil {
+			h.badRequest(w, r, "invalid request body: "+err.Error())
+			return
+		}
+	}
+
+	run, err := h.svc.GenerateForScored(r.Context(), body.Limit)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	h.writeJSON(w, r, http.StatusOK, run)
+}
+
+// GetCV handles GET /jobs/{id}/cv — the generated CV as markdown.
+func (h *Handler) GetCV(w http.ResponseWriter, r *http.Request) {
+	h.serveDocument(w, r, "cv")
+}
+
+// GetCoverLetter handles GET /jobs/{id}/cover-letter.
+func (h *Handler) GetCoverLetter(w http.ResponseWriter, r *http.Request) {
+	h.serveDocument(w, r, "letter")
+}
+
+// serveDocument returns one generated document.
+//
+// Content type is text/markdown rather than JSON: these are documents meant to
+// be read and edited, and wrapping prose in a JSON string just means the client
+// has to unescape every newline before it can show anything.
+func (h *Handler) serveDocument(w http.ResponseWriter, r *http.Request, which string) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		h.badRequest(w, r, "job id is required")
+		return
+	}
+
+	cv, letter, generatedAt, err := h.svc.Documents(r.Context(), id)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	if generatedAt == nil {
+		h.writeJSON(w, r, http.StatusNotFound, map[string]any{
+			"error": map[string]string{
+				"message": "no documents generated for this job yet — it must reach CVGenerated first",
+			},
+		})
+		return
+	}
+
+	doc := cv
+	if which == "letter" {
+		doc = letter
+	}
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Header().Set("X-Generated-At", generatedAt.UTC().Format(time.RFC3339))
+	_, _ = w.Write([]byte(doc))
 }

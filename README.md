@@ -347,7 +347,7 @@ backend, n8n, Postgres, Beszel — is reachable only on the internal Docker
 network.
 
 ```
-host :7080/:7443 -> Caddy -+-> api.sakajob.home  backend:8080
+host :7080/:7443 -> Caddy -+-> api.sakajob.home  backend:2623
                            +-> n8n.sakajob.home  n8n:5678
                  postgres      (internal only — no host port)
                  beszel-agent  (host network, collects metrics)
@@ -455,7 +455,11 @@ the way through — then widened. Recommended order:
    description on our plan, so scoring runs on the AI-extracted fields
    (`ai_key_skills`, `ai_keywords`, `ai_requirements_summary`) — which is the
    cost-saving path this README already argued for.
-7. [ ] **CV/cover-letter generation** (WF-C).
+7. [done] **CV/cover-letter generation** (WF-C + `/internal/generation/run`).
+   Documents are stored as text on the job row and served as markdown at
+   `/jobs/{id}/cv` and `/jobs/{id}/cover-letter`. Models are per-stage and set
+   in the profile, so scoring and generation can use different ones — which
+   also means separate daily quotas on free tiers.
 8. [ ] **Approval in the app** -> `PATCH /jobs/{id}`.
 9. [ ] **Sending + follow-ups** (WF-D, WF-E).
 10. [ ] **Dashboard, audit trail, polish.**

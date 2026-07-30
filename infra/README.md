@@ -3,7 +3,7 @@
 ## Topology (local dev)
 Only Caddy is exposed to the host. Everything else is internal.
 
-    host :7080/:7443  ->  Caddy  ->  api.sakajob.home  ->  backend:8080
+    host :7080/:7443  ->  Caddy  ->  api.sakajob.home  ->  backend:2623
                                  ->  n8n.sakajob.home  ->  n8n:5678
                           postgres      (internal only, no host port)
 

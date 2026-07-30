@@ -1,7 +1,8 @@
 {
   "name": "WF-A Ingest",
+  "id": "jobhunter-wf-a",
   "active": false,
-  "versionId": "a1a1a1a1-0000-4000-8000-00000000a11a",
+  "versionId": "a1a1a1a1-0000-4000-8000-00000000a11b",
   "settings": {
     "executionOrder": "v1",
     "saveManualExecutions": true,
@@ -36,7 +37,7 @@
     },
     {
       "parameters": {
-        "url": "http://backend:8080/profile",
+        "url": "http://backend:2623/profile",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -123,7 +124,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://backend:8080/internal/jobs/ingest",
+        "url": "http://backend:2623/internal/jobs/ingest",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -145,7 +146,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://backend:8080/internal/errors",
+        "url": "http://backend:2623/internal/errors",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,

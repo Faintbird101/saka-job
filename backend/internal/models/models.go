@@ -100,6 +100,14 @@ type Job struct {
 	DateApplied    *time.Time      `json:"date_applied"`
 	EmailUsed      string          `json:"email_used,omitempty"`
 
+	// Generated documents (WF-C). Stored as text on the row rather than files
+	// on a volume: no orphans when a job is rejected, nothing extra to back up,
+	// and the text stays editable right up to approval.
+	CVText          string     `json:"cv_text,omitempty"`
+	CoverLetterText string     `json:"cover_letter_text,omitempty"`
+	GeneratedAt     *time.Time `json:"generated_at,omitempty"`
+	GeneratedBy     string     `json:"generated_by,omitempty"`
+
 	// RawPayload is the untouched API item, kept so a scoring or generation
 	// bug can be replayed without burning another API call from the quota.
 	RawPayload json.RawMessage `json:"raw_payload,omitempty"`
@@ -115,7 +123,17 @@ type Profile struct {
 	PreferredSkills   json.RawMessage `json:"preferred_skills"`
 	MinScoreThreshold int             `json:"min_score_threshold"`
 	MaxJobsPerRun     int             `json:"max_jobs_per_run"`
-	UpdatedAt         time.Time       `json:"updated_at"`
+
+	// Per-stage model overrides. Empty means "use the LLM_MODEL environment
+	// value". Kept here rather than in the environment so they are editable
+	// from the app without a restart — and because provider free tiers meter
+	// quota per model, pointing the two stages at different models doubles the
+	// daily allowance rather than sharing one.
+	ScoringModel     string `json:"scoring_model"`
+	GenerationModel  string `json:"generation_model"`
+	CoverLetterNotes string `json:"cover_letter_notes"`
+
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // ProfileUpdate is the PATCH body for the profile. Every field is a pointer so
@@ -126,6 +144,9 @@ type ProfileUpdate struct {
 	PreferredSkills   *json.RawMessage `json:"preferred_skills"`
 	MinScoreThreshold *int             `json:"min_score_threshold"`
 	MaxJobsPerRun     *int             `json:"max_jobs_per_run"`
+	ScoringModel      *string          `json:"scoring_model"`
+	GenerationModel   *string          `json:"generation_model"`
+	CoverLetterNotes  *string          `json:"cover_letter_notes"`
 }
 
 // JobUpdate is the PATCH body for a job. Same pointer rule as ProfileUpdate.

@@ -3,7 +3,9 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/yourname/jobhunter/backend/internal/models"
 )
 
@@ -106,4 +108,39 @@ func intParam(r *http.Request, name string) int {
 		return 0
 	}
 	return n
+}
+
+// ClearErrors handles DELETE /errors — prune the application error log.
+//
+// Optional ?older_than_hours=N keeps recent entries. Without it, everything
+// goes.
+func (h *Handler) ClearErrors(w http.ResponseWriter, r *http.Request) {
+	var cutoff *time.Time
+	if n := intParam(r, "older_than_hours"); n > 0 {
+		t := time.Now().Add(-time.Duration(n) * time.Hour)
+		cutoff = &t
+	}
+
+	deleted, err := h.svc.ClearErrors(r.Context(), cutoff)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	h.writeJSON(w, r, http.StatusOK, map[string]any{"deleted": deleted})
+}
+
+// RescoreJob handles POST /jobs/{id}/rescore — re-run scoring for one job.
+func (h *Handler) RescoreJob(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		h.badRequest(w, r, "job id is required")
+		return
+	}
+
+	job, err := h.svc.RescoreJob(r.Context(), id)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	h.writeJSON(w, r, http.StatusOK, job)
 }
