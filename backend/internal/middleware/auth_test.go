@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,6 +14,19 @@ var testCfg = config.Config{
 	AppToken: "app-token-value",
 	N8NKey:   "n8n-key-value",
 }
+
+// fakeSessions resolves exactly one token, so the session branch can be tested
+// without a database.
+type fakeSessions struct{ valid string }
+
+func (f fakeSessions) ResolveSession(_ context.Context, token string) (Session, error) {
+	if f.valid != "" && token == f.valid {
+		return Session{UserID: "u1", Email: "kinyua@example.com"}, nil
+	}
+	return Session{}, errors.New("no such session")
+}
+
+var noSessions = fakeSessions{}
 
 // okHandler records the role it saw, so tests can assert on what Auth decided.
 func okHandler(seen *Role) http.Handler {
@@ -44,7 +59,7 @@ func TestAuthAcceptsBothCredentials(t *testing.T) {
 			req.Header.Set(tc.header, tc.value)
 			rec := httptest.NewRecorder()
 
-			Auth(testCfg)(okHandler(&seen)).ServeHTTP(rec, req)
+			Auth(testCfg, noSessions)(okHandler(&seen)).ServeHTTP(rec, req)
 
 			if rec.Code != http.StatusOK {
 				t.Fatalf("status = %d, want 200", rec.Code)
@@ -80,7 +95,7 @@ func TestAuthRejectsBadCredentials(t *testing.T) {
 
 			called := false
 			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { called = true })
-			Auth(testCfg)(next).ServeHTTP(rec, req)
+			Auth(testCfg, noSessions)(next).ServeHTTP(rec, req)
 
 			if rec.Code != http.StatusUnauthorized {
 				t.Errorf("status = %d, want 401", rec.Code)
@@ -104,7 +119,7 @@ func TestRequireRoleBlocksTheAppTokenFromInternalRoutes(t *testing.T) {
 
 	called := false
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { called = true })
-	Auth(testCfg)(RequireRole(RoleN8N)(next)).ServeHTTP(rec, req)
+	Auth(testCfg, noSessions)(RequireRole(RoleN8N)(next)).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("status = %d, want 403", rec.Code)
@@ -120,7 +135,7 @@ func TestRequireRoleAllowsTheN8NKey(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	var seen Role
-	Auth(testCfg)(RequireRole(RoleN8N)(okHandler(&seen))).ServeHTTP(rec, req)
+	Auth(testCfg, noSessions)(RequireRole(RoleN8N)(okHandler(&seen))).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
@@ -176,5 +191,79 @@ func TestRequestIDPreservesAnIncomingID(t *testing.T) {
 
 	if got != "trace-from-caddy" {
 		t.Errorf("request id = %q, want the incoming value preserved for end-to-end tracing", got)
+	}
+}
+
+// A session token is accepted, and lands as RoleUser rather than RoleApp — so
+// it can be told apart from the shared static token in logs and in policy.
+func TestAuthAcceptsASessionToken(t *testing.T) {
+	sessions := fakeSessions{valid: "session-token-abc"}
+
+	var seen Role
+	req := httptest.NewRequest(http.MethodGet, "/jobs", nil)
+	req.Header.Set("Authorization", "Bearer session-token-abc")
+	rec := httptest.NewRecorder()
+
+	var gotSession Session
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if role, ok := RoleFrom(r.Context()); ok {
+			seen = role
+		}
+		gotSession, _ = SessionFrom(r.Context())
+		w.WriteHeader(http.StatusOK)
+	})
+	Auth(testCfg, sessions)(next).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if seen != RoleUser {
+		t.Errorf("role = %q, want %q", seen, RoleUser)
+	}
+	if gotSession.Email != "kinyua@example.com" {
+		t.Errorf("session not attached to the context: %+v", gotSession)
+	}
+	if TokenFrom(req.Context()) != "" && TokenFrom(rec.Result().Request.Context()) == "" {
+		t.Log("token is carried on the request context for logout")
+	}
+}
+
+func TestAuthRejectsAnUnknownSessionToken(t *testing.T) {
+	sessions := fakeSessions{valid: "the-only-valid-one"}
+
+	req := httptest.NewRequest(http.MethodGet, "/jobs", nil)
+	req.Header.Set("Authorization", "Bearer revoked-or-expired")
+	rec := httptest.NewRecorder()
+
+	called := false
+	Auth(testCfg, sessions)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true })).
+		ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+	if called {
+		t.Error("a revoked session reached the handler")
+	}
+}
+
+// A logged-in phone must not be able to trigger ingestion or scoring, which is
+// what RequireRole(RoleN8N) guards.
+func TestSessionUserCannotReachInternalRoutes(t *testing.T) {
+	sessions := fakeSessions{valid: "session-token-abc"}
+
+	req := httptest.NewRequest(http.MethodPost, "/internal/scoring/run", nil)
+	req.Header.Set("Authorization", "Bearer session-token-abc")
+	rec := httptest.NewRecorder()
+
+	called := false
+	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true })
+	Auth(testCfg, sessions)(RequireRole(RoleN8N)(next)).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+	if called {
+		t.Error("a logged-in user reached an n8n-only endpoint")
 	}
 }

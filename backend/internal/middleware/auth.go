@@ -7,6 +7,7 @@ import (
 	"crypto/subtle"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/yourname/jobhunter/backend/internal/config"
 )
@@ -18,6 +19,10 @@ const (
 	// RoleApp is the Flutter app: it may read jobs, patch the human-decision
 	// fields, and edit the profile.
 	RoleApp Role = "app"
+	// RoleUser is a logged-in account holding a session token. Same privileges
+	// as RoleApp, but attributable to a person and revocable individually,
+	// which a shared static token can never be.
+	RoleUser Role = "user"
 	// RoleN8N is the automation layer: it may additionally ingest jobs and
 	// write pipeline fields (score, CV URLs, error log).
 	RoleN8N Role = "n8n"
@@ -25,7 +30,38 @@ const (
 
 type ctxKey int
 
-const roleKey ctxKey = iota
+const (
+	roleKey ctxKey = iota
+	sessionKey
+	tokenKey
+)
+
+// SessionResolver is the subset of the service layer that Auth needs. An
+// interface rather than the concrete type so middleware does not depend on
+// service, which depends on db.
+type SessionResolver interface {
+	ResolveSession(ctx context.Context, token string) (Session, error)
+}
+
+// Session is the authenticated identity attached to a request.
+type Session struct {
+	UserID    string    `json:"user_id"`
+	Email     string    `json:"email"`
+	Name      string    `json:"display_name,omitempty"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// SessionFrom returns the logged-in account on a request context, if any.
+func SessionFrom(ctx context.Context) (Session, bool) {
+	s, ok := ctx.Value(sessionKey).(Session)
+	return s, ok
+}
+
+// TokenFrom returns the raw bearer token, for logout.
+func TokenFrom(ctx context.Context) string {
+	t, _ := ctx.Value(tokenKey).(string)
+	return t
+}
 
 // RoleFrom returns the authenticated role on a request context.
 func RoleFrom(ctx context.Context) (Role, bool) {
@@ -44,7 +80,7 @@ func RoleFrom(ctx context.Context) (Role, bool) {
 //
 //	Authorization: Bearer <token>
 //	X-API-Key: <token>
-func Auth(cfg config.Config) func(http.Handler) http.Handler {
+func Auth(cfg config.Config, sessions SessionResolver) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := presentedToken(r)
@@ -53,8 +89,14 @@ func Auth(cfg config.Config) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Constant-time compare on both branches: a timing difference here
-			// would leak the token a character at a time.
+			ctx := r.Context()
+
+			// Static service credentials first: they are a constant-time
+			// compare with no database round trip, and n8n presents one on
+			// every automated call.
+			//
+			// Constant-time on both branches — a timing difference would leak
+			// the token a character at a time.
 			var role Role
 			switch {
 			case secureEqual(token, cfg.N8NKey):
@@ -62,11 +104,24 @@ func Auth(cfg config.Config) func(http.Handler) http.Handler {
 			case secureEqual(token, cfg.AppToken):
 				role = RoleApp
 			default:
-				unauthorized(w, "invalid credentials")
-				return
+				// Not a service token: try it as a session. Unknown, revoked,
+				// and expired all land here and are indistinguishable to the
+				// caller, which is the point.
+				if sessions == nil {
+					unauthorized(w, "invalid credentials")
+					return
+				}
+				sess, err := sessions.ResolveSession(ctx, token)
+				if err != nil {
+					unauthorized(w, "invalid or expired credentials")
+					return
+				}
+				role = RoleUser
+				ctx = context.WithValue(ctx, sessionKey, sess)
+				ctx = context.WithValue(ctx, tokenKey, token)
 			}
 
-			ctx := context.WithValue(r.Context(), roleKey, role)
+			ctx = context.WithValue(ctx, roleKey, role)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -75,6 +130,9 @@ func Auth(cfg config.Config) func(http.Handler) http.Handler {
 // RequireRole gates a route group to a specific credential. Applied to
 // /internal/*, it is what stops a phone token from reaching the ingest
 // endpoint.
+//
+// Note RoleUser is deliberately NOT accepted anywhere RoleN8N is required: a
+// logged-in phone must not be able to trigger ingestion or scoring runs.
 func RequireRole(want Role) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -11,6 +12,23 @@ import (
 	"github.com/yourname/jobhunter/backend/internal/middleware"
 	"github.com/yourname/jobhunter/backend/internal/service"
 )
+
+// sessionAdapter bridges the service layer to the middleware's interface.
+//
+// middleware deliberately does not import service (service imports db, and
+// middleware must stay dependency-light), so the two declare their own Session
+// types and this converts between them. Six lines to keep the layering honest.
+type sessionAdapter struct{ svc *service.Service }
+
+func (a sessionAdapter) ResolveSession(ctx context.Context, token string) (middleware.Session, error) {
+	s, err := a.svc.ResolveSession(ctx, token)
+	if err != nil {
+		return middleware.Session{}, err
+	}
+	return middleware.Session{
+		UserID: s.UserID, Email: s.Email, Name: s.Name, ExpiresAt: s.ExpiresAt,
+	}, nil
+}
 
 // Router wires every route.
 //
@@ -42,10 +60,17 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 	// is authenticated like any other client. See profile_page.go.
 	r.Get("/profile/edit", h.ProfilePage)
 
+	// Auth entry points, necessarily unauthenticated. /auth/status only reveals
+	// whether an account exists — which a login attempt reveals anyway — and
+	// /auth/bootstrap closes permanently once one does.
+	r.Get("/auth/status", h.AuthStatus)
+	r.Post("/auth/bootstrap", h.Bootstrap)
+	r.Post("/auth/login", h.Login)
+
 	// ---- app + n8n: either credential is accepted ----
 	r.Group(func(r chi.Router) {
 		r.Use(chimw.Timeout(cfg.Timeout))
-		r.Use(middleware.Auth(cfg))
+		r.Use(middleware.Auth(cfg, sessionAdapter{svc}))
 
 		r.Get("/jobs", h.ListJobs)
 		r.Get("/jobs/{id}", h.GetJob)
@@ -74,6 +99,13 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 		r.Get("/statuses", h.Statuses)
 		r.Get("/fetch-logs", h.ListFetchLogs)
 		r.Get("/errors", h.ListErrors)
+
+		// Session management and push registration.
+		r.Get("/auth/me", h.Me)
+		r.Post("/auth/logout", h.Logout)
+		r.Post("/auth/logout-all", h.LogoutEverywhere)
+		r.Post("/devices", h.RegisterDevice)
+		r.Delete("/devices", h.UnregisterDevice)
 		// Pruning matters: a permanently red error badge is one nobody reads.
 		r.Delete("/errors", h.ClearErrors)
 		// Re-run scoring for one job after tuning the CV, threshold, or weights,
@@ -87,7 +119,7 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 	// jobs table.
 	r.Group(func(r chi.Router) {
 		r.Use(chimw.Timeout(cfg.Timeout))
-		r.Use(middleware.Auth(cfg))
+		r.Use(middleware.Auth(cfg, sessionAdapter{svc}))
 		r.Use(middleware.RequireRole(middleware.RoleN8N))
 
 		r.Post("/internal/jobs/ingest", h.Ingest)
@@ -113,7 +145,7 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 	// as "the model returned garbage".
 	r.Group(func(r chi.Router) {
 		r.Use(chimw.Timeout(cfg.ScoringTimeout))
-		r.Use(middleware.Auth(cfg))
+		r.Use(middleware.Auth(cfg, sessionAdapter{svc}))
 		r.Use(middleware.RequireRole(middleware.RoleN8N))
 
 		r.Post("/internal/scoring/run", h.RunScoring)

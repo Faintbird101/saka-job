@@ -154,6 +154,12 @@ type Profile struct {
 	// ever suggested, never applied.
 	InboxAutoConfidence int `json:"inbox_auto_confidence"`
 
+	// Which push notifications to send.
+	PushOnApproval bool `json:"push_on_approval"`
+	PushOnReply    bool `json:"push_on_reply"`
+	PushOnFollowUp bool `json:"push_on_followup"`
+	PushOnFailure  bool `json:"push_on_failure"`
+
 	// FollowUpAfterDays is how long to wait after applying before chasing.
 	// FollowUpCloseDays is how long after chasing to give up; 0 disables it.
 	FollowUpAfterDays int `json:"followup_after_days"`
@@ -177,6 +183,10 @@ type ProfileUpdate struct {
 	InboxAutoConfidence  *int             `json:"inbox_auto_confidence"`
 	FollowUpAfterDays    *int             `json:"followup_after_days"`
 	FollowUpCloseDays    *int             `json:"followup_close_days"`
+	PushOnApproval       *bool            `json:"push_on_approval"`
+	PushOnReply          *bool            `json:"push_on_reply"`
+	PushOnFollowUp       *bool            `json:"push_on_followup"`
+	PushOnFailure        *bool            `json:"push_on_failure"`
 	NotifyEmail          *string          `json:"notify_email"`
 }
 
@@ -226,6 +236,23 @@ type JobEvent struct {
 
 	MessageID string    `json:"message_id,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// User is an account. Single-user for now — see migration 0006 for why there
+// is no user_id on the pipeline tables.
+type User struct {
+	ID          string    `json:"id"`
+	Email       string    `json:"email"`
+	DisplayName string    `json:"display_name,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// PushDevice is one installed app instance that can receive notifications.
+type PushDevice struct {
+	Token      string    `json:"token"`
+	Platform   string    `json:"platform,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+	LastSeenAt time.Time `json:"last_seen_at"`
 }
 
 // ErrorRecord is one row of the application error log.

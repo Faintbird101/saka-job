@@ -69,6 +69,11 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) 
 		code, msg = http.StatusBadRequest, err.Error()
 	case errors.Is(err, service.ErrConflict):
 		code, msg = http.StatusConflict, err.Error()
+	case errors.Is(err, service.ErrUnauthorized):
+		// The message is deliberately the generic "invalid email or password",
+		// identical for an unknown address and a wrong password, so the
+		// endpoint cannot be used to discover which addresses have accounts.
+		code, msg = http.StatusUnauthorized, err.Error()
 	default:
 		// Unexpected errors are logged in full but reported generically:
 		// a raw pgx error can leak column names and the connection string.

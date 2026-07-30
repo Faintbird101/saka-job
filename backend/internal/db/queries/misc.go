@@ -19,6 +19,10 @@ SELECT
     inbox_auto_confidence,
     followup_after_days,
     followup_close_days,
+    push_on_approval,
+    push_on_reply,
+    push_on_followup,
+    push_on_failure,
     updated_at
 FROM profile
 WHERE id = 1`
@@ -39,7 +43,11 @@ UPDATE profile SET
     notify_email        = COALESCE($10, notify_email),
     inbox_auto_confidence = COALESCE($11, inbox_auto_confidence),
     followup_after_days = COALESCE($12, followup_after_days),
-    followup_close_days = COALESCE($13, followup_close_days)
+    followup_close_days = COALESCE($13, followup_close_days),
+    push_on_approval = COALESCE($14, push_on_approval),
+    push_on_reply = COALESCE($15, push_on_reply),
+    push_on_followup = COALESCE($16, push_on_followup),
+    push_on_failure = COALESCE($17, push_on_failure)
 WHERE id = 1
 RETURNING
     COALESCE(master_cv, ''),
@@ -55,6 +63,10 @@ RETURNING
     inbox_auto_confidence,
     followup_after_days,
     followup_close_days,
+    push_on_approval,
+    push_on_reply,
+    push_on_followup,
+    push_on_failure,
     updated_at`
 
 // ---------- fetch_log (API quota visibility) ----------
