@@ -1,5 +1,7 @@
 {
   "name": "WF-B Score",
+  "active": false,
+  "versionId": "b2b2b2b2-0000-4000-8000-00000000b22b",
   "settings": {
     "executionOrder": "v1",
     "saveManualExecutions": true,
