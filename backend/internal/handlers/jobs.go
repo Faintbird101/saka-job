@@ -171,6 +171,31 @@ func (h *Handler) RunGeneration(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, r, http.StatusOK, run)
 }
 
+// RunFollowUps handles POST /internal/follow-ups/run — WF-E's entry point.
+//
+// It returns a rendered digest rather than sending anything itself, for the
+// same reason as the apply packs: nothing in this pipeline emails an employer,
+// and keeping delivery in the workflow means switching from email to Slack is a
+// one-node change.
+func (h *Handler) RunFollowUps(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Limit int `json:"limit"`
+	}
+	if r.ContentLength > 0 {
+		if err := decodeJSON(w, r, &body); err != nil {
+			h.badRequest(w, r, "invalid request body: "+err.Error())
+			return
+		}
+	}
+
+	run, err := h.svc.RunFollowUps(r.Context(), body.Limit)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	h.writeJSON(w, r, http.StatusOK, run)
+}
+
 // GetCV handles GET /jobs/{id}/cv — the generated CV as markdown.
 func (h *Handler) GetCV(w http.ResponseWriter, r *http.Request) {
 	h.serveDocument(w, r, "cv")

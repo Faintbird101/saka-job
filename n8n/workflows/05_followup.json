@@ -1,0 +1,151 @@
+{
+  "name": "WF-E Follow-ups",
+  "id": "jobhunter-wf-e",
+  "active": false,
+  "versionId": "e5e5e5e5-0000-4000-8000-00000000e55e",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "timezone": "Africa/Nairobi"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 9 * * *" }
+          ]
+        }
+      },
+      "id": "e5000000-0000-4000-8000-000000000001",
+      "name": "Daily at 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-440, 0],
+      "notes": "Once a day, not twice: a follow-up is measured in days, so running it more often would only re-check the same clock.\n\nDeliberately after WF-F (08:30) so today's replies are already recorded — otherwise a job that was answered this morning could still be chased this morning."
+    },
+    {
+      "parameters": {},
+      "id": "e5000000-0000-4000-8000-000000000002",
+      "name": "Run now (manual)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-440, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:2623/internal/follow-ups/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ limit: 25 }) }}",
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "fullResponse": true, "neverError": true } }
+        }
+      },
+      "id": "e5000000-0000-4000-8000-000000000003",
+      "name": "Find silent applications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-180, 80],
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      },
+      "notes": "Finds Applied jobs older than profile.followup_after_days that have NO recorded inbound email, moves them to FollowUpSent, and returns a digest with a draft note per job.\n\nThe 'no inbound email' check is what the inbox scanner bought us. Before WF-F existed, 'no reply' was unknowable and this would have been a timer that cheerfully chased employers who had already answered.\n\nIt also closes jobs that were chased and still went silent after followup_close_days, so the list does not grow forever.\n\nAs everywhere else: nothing here contacts an employer. The digest goes to you."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "ok",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 300,
+              "operator": { "type": "number", "operation": "lt" }
+            },
+            {
+              "id": "has-any",
+              "leftValue": "={{ ($json.body || {}).count || 0 }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e5000000-0000-4000-8000-000000000004",
+      "name": "Anything to chase?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [80, 0],
+      "notes": "Success AND non-empty, not just non-empty. Checking the count alone would read a 500 as 'nothing to do' and stay silent about a broken run — the same shape of bug that had WF-A reporting an exhausted quota as an empty search."
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ ($json.body || {}).notify_to }}",
+        "toEmail": "={{ ($json.body || {}).notify_to }}",
+        "subject": "={{ `JobHunter: ${($json.body || {}).count} application(s) with no reply` }}",
+        "emailFormat": "text",
+        "text": "={{ ($json.body || {}).digest_text }}",
+        "options": {}
+      },
+      "id": "e5000000-0000-4000-8000-000000000005",
+      "name": "Email the reminder to me",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [360, -60],
+      "onError": "continueErrorOutput",
+      "notes": "Same SMTP credential as WF-D, and the same rule: From and To are both your own address. The digest contains a draft follow-up per job that you can paste and send yourself."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:2623/internal/errors",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: 'WF-E', message: ($json.error?.message || `follow-up run failed (HTTP ${$json.statusCode || '?'})`), context: { execution_id: $execution.id, detail: $json } }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "e5000000-0000-4000-8000-000000000006",
+      "name": "Record problem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [360, 140],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      }
+    }
+  ],
+  "connections": {
+    "Daily at 09:00": {
+      "main": [[{ "node": "Find silent applications", "type": "main", "index": 0 }]]
+    },
+    "Run now (manual)": {
+      "main": [[{ "node": "Find silent applications", "type": "main", "index": 0 }]]
+    },
+    "Find silent applications": {
+      "main": [[{ "node": "Anything to chase?", "type": "main", "index": 0 }]]
+    },
+    "Anything to chase?": {
+      "main": [
+        [{ "node": "Email the reminder to me", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Email the reminder to me": {
+      "main": [[], [{ "node": "Record problem", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {}
+}

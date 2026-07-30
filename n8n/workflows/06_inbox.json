@@ -1,0 +1,135 @@
+{
+  "name": "WF-F Inbox Scan",
+  "id": "jobhunter-wf-f",
+  "active": false,
+  "versionId": "f6f6f6f6-0000-4000-8000-00000000f66f",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "timezone": "Africa/Nairobi"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "postProcessAction": "nothing",
+        "options": {
+          "customEmailConfig": "[\"UNSEEN\"]",
+          "forceReconnect": 60
+        }
+      },
+      "id": "f6000000-0000-4000-8000-000000000001",
+      "name": "Watch inbox",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [-460, 0],
+      "alwaysOutputData": false,
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "imap": { "id": "REPLACE_ME_IMAP", "name": "Gmail IMAP" }
+      },
+      "notes": "Needs an IMAP credential: host imap.gmail.com, port 993, SSL/TLS on, and the SAME Gmail app password as the SMTP credential. If Avast (or similar) is intercepting TLS, tick 'Allow Self-Signed Certificates' here — the NODE_EXTRA_CA_CERTS mount covers Node's own TLS, but this node has its own toggle.\n\npostProcessAction is 'nothing': messages are left UNREAD and untouched. This workflow reads your mail, it does not manage it — marking things read behind your back would be a surprising side effect, and the backend already de-duplicates on message id.\n\nIMAP requires enabling in Gmail: Settings -> Forwarding and POP/IMAP -> Enable IMAP."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reshape n8n's IMAP items into the backend's scan payload, and drop\n// anything that predates the first application.\n//\n// The date filter is the privacy scope: nothing older than your earliest\n// application can possibly be a reply to one, so there is no reason to send it\n// anywhere. The backend reports earliest_relevant on every run; until it has,\n// a conservative 90-day window applies.\n\nconst FALLBACK_DAYS = 90;\nconst cutoff = new Date(Date.now() - FALLBACK_DAYS * 86400000);\n\nconst messages = [];\nfor (const item of $input.all()) {\n  const j = item.json || {};\n\n  const received = j.date || j.receivedDate || (j.headers && j.headers.date) || '';\n  const when = received ? new Date(received) : null;\n  if (when && !isNaN(when) && when < cutoff) continue;\n\n  const from = j.from\n    || (j.headers && (j.headers.from || j.headers.From))\n    || (j.fromAddress || '');\n\n  // textPlain is preferred over textHtml: the classifier reads words, and\n  // HTML would bury them in markup and inflate what we store.\n  const body = j.textPlain || j.text || j.textHtml || '';\n\n  messages.push({\n    message_id: j.messageId || (j.headers && j.headers['message-id']) || '',\n    from: String(from),\n    subject: String(j.subject || ''),\n    body: String(body).slice(0, 8000),\n    received_at: String(received),\n  });\n}\n\n// One item carrying the batch: the backend scans a whole batch per call so it\n// loads the candidate jobs once rather than per message.\nreturn [{ json: { messages } }];"
+      },
+      "id": "f6000000-0000-4000-8000-000000000002",
+      "name": "Shape and scope",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-200, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:2623/internal/inbox/scan",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 300000,
+          "response": { "response": { "fullResponse": true, "neverError": true } }
+        }
+      },
+      "id": "f6000000-0000-4000-8000-000000000003",
+      "name": "Match and classify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [60, 0],
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      },
+      "notes": "The backend matches each message to an application and classifies it.\n\nOnly acknowledgements are applied automatically. Rejections, interview invitations and offers are recorded as SUGGESTIONS for you to confirm in the app, because acting on a misread would either abandon a live opportunity or claim progress that never happened.\n\nAmbiguous mail — several open roles at one employer, nothing to tell them apart — is filed for review with no suggestion rather than attributed by guess.\n\nRescans are safe: the backend de-duplicates on message id, so the same reply is never suggested twice."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "failed",
+              "leftValue": "={{ $json.statusCode || 0 }}",
+              "rightValue": 299,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f6000000-0000-4000-8000-000000000004",
+      "name": "Did the scan fail?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [320, 0],
+      "notes": "Unmatched mail is NOT a failure — most of your inbox is unrelated to job hunting, and the backend keeps unmatched messages for review anyway. Only a non-2xx response counts."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:2623/internal/errors",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: 'WF-F', message: ($json.error?.message || `inbox scan failed (HTTP ${$json.statusCode || '?'})`), context: { execution_id: $execution.id, detail: $json } }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "f6000000-0000-4000-8000-000000000005",
+      "name": "Record problem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [580, 80],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      }
+    }
+  ],
+  "connections": {
+    "Watch inbox": {
+      "main": [
+        [{ "node": "Shape and scope", "type": "main", "index": 0 }],
+        [{ "node": "Record problem", "type": "main", "index": 0 }]
+      ]
+    },
+    "Shape and scope": {
+      "main": [[{ "node": "Match and classify", "type": "main", "index": 0 }]]
+    },
+    "Match and classify": {
+      "main": [[{ "node": "Did the scan fail?", "type": "main", "index": 0 }]]
+    },
+    "Did the scan fail?": {
+      "main": [
+        [{ "node": "Record problem", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "pinData": {}
+}

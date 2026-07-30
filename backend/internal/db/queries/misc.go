@@ -17,6 +17,8 @@ SELECT
     manual_apply_grace_days,
     COALESCE(notify_email, ''),
     inbox_auto_confidence,
+    followup_after_days,
+    followup_close_days,
     updated_at
 FROM profile
 WHERE id = 1`
@@ -35,7 +37,9 @@ UPDATE profile SET
     cover_letter_notes  = COALESCE($8, cover_letter_notes),
     manual_apply_grace_days = COALESCE($9, manual_apply_grace_days),
     notify_email        = COALESCE($10, notify_email),
-    inbox_auto_confidence = COALESCE($11, inbox_auto_confidence)
+    inbox_auto_confidence = COALESCE($11, inbox_auto_confidence),
+    followup_after_days = COALESCE($12, followup_after_days),
+    followup_close_days = COALESCE($13, followup_close_days)
 WHERE id = 1
 RETURNING
     COALESCE(master_cv, ''),
@@ -49,6 +53,8 @@ RETURNING
     manual_apply_grace_days,
     COALESCE(notify_email, ''),
     inbox_auto_confidence,
+    followup_after_days,
+    followup_close_days,
     updated_at`
 
 // ---------- fetch_log (API quota visibility) ----------
@@ -136,4 +142,37 @@ WHERE status = 'ManualApply'
   -- driver then cannot encode an int into it: "unable to encode 7 into text
   -- format for text (OID 25)".
   AND manual_apply_at < now() - make_interval(days => $1)
+RETURNING id, title, organization`
+
+// JobsNeedingFollowUp is WF-E's work queue.
+//
+// The NOT EXISTS clause is what the inbox work bought us: before it, "no reply"
+// was unknowable and a follow-up was a blind nag sent on a timer. Now a job is
+// only chased if nothing has actually come back from that employer.
+//
+// $1 = days since applying, $2 = limit.
+const JobsNeedingFollowUp = `
+SELECT ` + JobColumns + `
+FROM jobs j
+WHERE j.status = 'Applied'
+  AND j.date_applied IS NOT NULL
+  AND j.date_applied < now() - make_interval(days => $1)
+  AND NOT EXISTS (SELECT 1 FROM job_events e WHERE e.job_id = j.id)
+ORDER BY j.date_applied ASC
+LIMIT $2`
+
+// MarkFollowUpSent stamps when the nudge went out, so the close-out sweep has a
+// clock of its own rather than reusing date_applied.
+const MarkFollowUpSent = `UPDATE jobs SET followup_at = now() WHERE id = $1`
+
+// ExpireFollowUps closes jobs that were chased and still went quiet. Without
+// this they sit in FollowUpSent forever and the dashboard stops meaning
+// anything.
+const ExpireFollowUps = `
+UPDATE jobs
+SET status = 'Closed'
+WHERE status = 'FollowUpSent'
+  AND followup_at IS NOT NULL
+  AND followup_at < now() - make_interval(days => $1)
+  AND NOT EXISTS (SELECT 1 FROM job_events e WHERE e.job_id = jobs.id)
 RETURNING id, title, organization`

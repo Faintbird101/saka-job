@@ -97,6 +97,10 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 		// WF-D: move Approved -> ManualApply and hand back a digest to notify
 		// the candidate. Never contacts an employer.
 		r.Post("/internal/apply-packs/run", h.RunApplyPacks)
+		// WF-E: chase applications that went quiet and close the ones that
+		// stayed quiet. Only reaches jobs with no recorded inbound reply, which
+		// is what the inbox scanner made knowable.
+		r.Post("/internal/follow-ups/run", h.RunFollowUps)
 	})
 
 	// ---- n8n only, long-running ----

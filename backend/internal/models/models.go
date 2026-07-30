@@ -154,6 +154,11 @@ type Profile struct {
 	// ever suggested, never applied.
 	InboxAutoConfidence int `json:"inbox_auto_confidence"`
 
+	// FollowUpAfterDays is how long to wait after applying before chasing.
+	// FollowUpCloseDays is how long after chasing to give up; 0 disables it.
+	FollowUpAfterDays int `json:"followup_after_days"`
+	FollowUpCloseDays int `json:"followup_close_days"`
+
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -170,6 +175,8 @@ type ProfileUpdate struct {
 	CoverLetterNotes     *string          `json:"cover_letter_notes"`
 	ManualApplyGraceDays *int             `json:"manual_apply_grace_days"`
 	InboxAutoConfidence  *int             `json:"inbox_auto_confidence"`
+	FollowUpAfterDays    *int             `json:"followup_after_days"`
+	FollowUpCloseDays    *int             `json:"followup_close_days"`
 	NotifyEmail          *string          `json:"notify_email"`
 }
 
