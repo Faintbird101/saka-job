@@ -120,6 +120,7 @@ func (s *Service) insertJob(ctx context.Context, j models.Job) (string, error) {
 		nullIfEmpty(j.SalaryUnit),
 		j.Status,
 		jsonbOrNull(j.RawPayload),
+		nullIfEmpty(j.OrgDomain),
 	).Scan(&id)
 
 	// No returned row is not an error here — it's the conflict clause doing

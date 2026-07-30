@@ -106,6 +106,7 @@ func scanJob(r row) (models.Job, error) {
 		&j.SalaryMin,
 		&j.SalaryMax,
 		&j.SalaryUnit,
+		&j.OrgDomain,
 		&j.Status,
 		&j.Score,
 		&matched,

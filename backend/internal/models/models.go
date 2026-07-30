@@ -6,6 +6,7 @@ package models
 
 import (
 	"encoding/json"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -43,6 +44,10 @@ type APIJob struct {
 	AISalaryMax      *float64 `json:"ai_salary_max_value"`
 	AISalaryUnit     string   `json:"ai_salary_unit_text"`
 
+	// The employer's real website. organization_url is a LinkedIn company page
+	// and is useless for matching inbound mail; this is the actual domain.
+	OrgWebsite string `json:"org_linkedin_website"`
+
 	Locations []struct {
 		Address struct {
 			AddressCountry  string `json:"addressCountry"`
@@ -69,6 +74,12 @@ type Job struct {
 	DescriptionText string     `json:"description_text,omitempty"`
 	DatePosted      *time.Time `json:"date_posted"`
 	DateValidThru   *time.Time `json:"date_valid_through,omitempty"`
+
+	// OrgDomain is the employer's REAL domain, lifted from
+	// raw_payload.org_linkedin_website at ingest. organization_url cannot serve
+	// here: it is a linkedin.com/company/... page, so every job would appear to
+	// share one domain and inbox matching would attribute mail at random.
+	OrgDomain string `json:"org_domain,omitempty"`
 
 	Country         string `json:"country"`
 	LocationRaw     string `json:"location_raw"`
@@ -310,7 +321,34 @@ func (a APIJob) Normalize(raw json.RawMessage) Job {
 		SalaryMax:      a.AISalaryMax,
 		SalaryUnit:     a.AISalaryUnit,
 
+		OrgDomain: hostFromURL(a.OrgWebsite),
+
 		RawPayload: raw,
 		Status:     StatusNew,
 	}
+}
+
+// hostFromURL reduces a website URL to a bare, comparable domain:
+// "https://www.Div-Systems.com/careers" -> "div-systems.com".
+//
+// Stored at ingest rather than parsed out of raw_payload on demand, so the
+// inbox matcher can index it — it runs against every candidate job for every
+// incoming email.
+func hostFromURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if !strings.Contains(raw, "//") {
+		raw = "https://" + raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	host := strings.ToLower(u.Host)
+	if i := strings.IndexByte(host, ':'); i >= 0 {
+		host = host[:i]
+	}
+	return strings.TrimPrefix(host, "www.")
 }
