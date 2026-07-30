@@ -99,3 +99,41 @@ https://localhost:7444 {
 http://api.sakajob.home:7080, http://n8n.sakajob.home:7080, http://localhost:7080 {
 	redir https://{host}:7443{uri} permanent
 }
+
+# ============================================================
+#  Plain-HTTP back ends for `tailscale serve`
+# ============================================================
+#
+# Tailscale terminates TLS itself, with a real Let's Encrypt certificate for
+# the machine's *.ts.net name, and forwards plaintext to a local port. So these
+# blocks are HTTP on purpose: adding `tls internal` would make Caddy present
+# its own CA's certificate to tailscaled, which would reject it — and the whole
+# reason for using Tailscale here is to get a certificate the Flutter app will
+# actually accept.
+#
+# Two details that are easy to get wrong:
+#
+#   1. The site address is a bare `:port`, NOT `http://localhost:port`. Caddy
+#      matches on the Host header, and tailscaled forwards with the .ts.net
+#      hostname — a `localhost` site block would never match and every request
+#      would 404.
+#
+#   2. These ports are published on 127.0.0.1 ONLY (see docker-compose.yml).
+#      They carry no TLS, so binding them to 0.0.0.0 would put the API in
+#      cleartext on whatever café wifi the laptop is joined to. Loopback means
+#      only the host's own tailscaled can reach them.
+#
+# The API at the root, so the app's base URL is just https://<machine>.ts.net.
+:7081 {
+	import common
+	reverse_proxy backend:2623
+}
+
+# n8n on its own port for the same reason it has one locally: it builds
+# absolute asset URLs from the site root and does not survive a path prefix.
+# Front it with a second `tailscale serve --https=8443` if you want the editor
+# reachable away from home.
+:7082 {
+	import common
+	reverse_proxy n8n:5678
+}

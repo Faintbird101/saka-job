@@ -24,6 +24,14 @@ services:
       # n8n and beszel each get a port so they can be served at "/" without a
       # path prefix — both break when hosted under one. See the Caddyfile.
       - "7444:7444"
+      # Plain-HTTP back ends for `tailscale serve`, which terminates TLS itself.
+      #
+      # Bound to 127.0.0.1 deliberately: these carry no TLS, so publishing them
+      # on 0.0.0.0 would expose the API in cleartext to whatever network the
+      # laptop is joined to. Loopback means only the host's own tailscaled can
+      # reach them.
+      - "127.0.0.1:7081:7081"
+      - "127.0.0.1:7082:7082"
       - "7445:7445"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
