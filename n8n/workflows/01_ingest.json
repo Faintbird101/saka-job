@@ -2,7 +2,7 @@
   "name": "WF-A Ingest",
   "id": "jobhunter-wf-a",
   "active": false,
-  "versionId": "a1a1a1a1-0000-4000-8000-00000000a11b",
+  "versionId": "a1a1a1a1-0000-4000-8000-00000000a11c",
   "settings": {
     "executionOrder": "v1",
     "saveManualExecutions": true,
@@ -104,12 +104,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [460, 0],
-      "alwaysOutputData": true,
+      "alwaysOutputData": false,
       "onError": "continueErrorOutput",
       "credentials": {
         "httpHeaderAuth": { "id": "REPLACE_ME_RAPIDAPI", "name": "RapidAPI (x-rapidapi-key)" }
       },
-      "notes": "Endpoint and parameter names verified against the live API on 2026-07-28: the path is /active-jb (NOT /active-jb-7d), time_frame is REQUIRED and must be one of 1h/24h/7d/6m, and the search parameter is `title` (not `title_filter`).\n\nThis plan returns no job description — description_text comes back null, and there is no parameter that enables it. WF-B must score against ai_key_skills / ai_keywords / ai_requirements_summary instead, which is what the README's cost-saving plan assumed anyway.\n\nalwaysOutputData is on so a search that matched nothing still flows downstream — a zero-result run consumed quota and must still produce a fetch_log row.\n\nErrors go out the second output rather than killing the run: one failing search should not cost you the other searches' results."
+      "notes": "Endpoint and parameter names verified against the live API on 2026-07-28: the path is /active-jb (NOT /active-jb-7d), time_frame is REQUIRED and must be one of 1h/24h/7d/6m, and the search parameter is `title` (not `title_filter`).\n\nThis plan returns no job description — description_text comes back null, and there is no parameter that enables it. WF-B must score against ai_key_skills / ai_keywords / ai_requirements_summary instead, which is what the README's cost-saving plan assumed anyway.\n\nalwaysOutputData is deliberately OFF. With it on, a FAILED request still emitted an empty item on the main output, so a 429 flowed through to Ingest and wrote a fetch_log row claiming zero results — indistinguishable from a search that genuinely matched nothing. Since fetch_log exists precisely to make quota consumption visible, reporting a refusal as an empty result was worse than losing the zero-result row. Real failures now go out the error output only, and are recorded in the errors table.\n\nErrors go out the second output rather than killing the run: one failing search should not cost you the other searches' results."
     },
     {
       "parameters": {
