@@ -1,0 +1,151 @@
+{
+  "name": "WF-D Apply Packs",
+  "active": false,
+  "id": "jobhunter-wf-d",
+  "versionId": "d4d4d4d4-0000-4000-8000-00000000d44d",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "timezone": "Africa/Nairobi"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 8,20 * * *" }
+          ]
+        }
+      },
+      "id": "d4000000-0000-4000-8000-000000000001",
+      "name": "Hourly after generation",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-440, 0],
+      "notes": "08:00 and 20:00 — an hour after the ingest/score/generate cycle, which leaves time for you to approve something from the morning batch before the digest goes out.\n\nAs with every other stage it reads its work from jobs.status rather than being chained to WF-C, so it simply finds whatever you have Approved since last time."
+    },
+    {
+      "parameters": {},
+      "id": "d4000000-0000-4000-8000-000000000002",
+      "name": "Run now (manual)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-440, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:2623/internal/apply-packs/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ limit: 25 }) }}",
+        "options": { "timeout": 60000, "response": { "response": { "fullResponse": true, "neverError": true } } }
+      },
+      "id": "d4000000-0000-4000-8000-000000000003",
+      "name": "Prepare apply packs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-180, 80],
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      },
+      "notes": "Moves every Approved job to ManualApply, stamps the grace-period clock, sweeps out anything that sat unapplied too long, and returns a ready-to-send digest.\n\nThis endpoint NEVER contacts an employer. Zero of the ingested jobs carried a hiring-manager email address — every posting is an apply URL — so an automated sender would have had nothing to send to. The digest goes to YOU.\n\nneverError + fullResponse for the same reason as WF-A: a failed call must stay distinguishable from a run that simply found nothing to do."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "has-work",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 300,
+              "operator": { "type": "number", "operation": "lt" }
+            },
+            {
+              "id": "count-check",
+              "leftValue": "={{ ($json.body || {}).count || 0 }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4000000-0000-4000-8000-000000000004",
+      "name": "Anything to send?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [80, 0],
+      "notes": "Two conditions, not one: the call must have succeeded AND produced at least one pack. Checking count alone would treat a 500 as 'nothing to do' and stay quiet about a broken run — the same class of bug that made WF-A report an exhausted quota as an empty search."
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ ($json.body || {}).notify_to }}",
+        "subject": "={{ `JobHunter: ${($json.body || {}).count} application(s) ready to submit` }}",
+        "emailFormat": "text",
+        "message": "={{ ($json.body || {}).digest_text }}",
+        "options": {}
+      },
+      "id": "d4000000-0000-4000-8000-000000000005",
+      "name": "Email the digest to me",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [360, -60],
+      "onError": "continueErrorOutput",
+      "notes": "Needs an SMTP credential in n8n, and profile.notify_email set to YOUR address.\n\nUntil both exist this node fails and the error branch records it — the jobs have still been moved to ManualApply and are visible in the app, so a missing SMTP setup delays the nudge rather than losing the work.\n\nIf you would rather be notified another way, replace this one node: everything upstream is delivery-agnostic and digest_text is already rendered."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:2623/internal/errors",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: 'WF-D', message: ($json.error?.message || `apply-pack run failed (HTTP ${$json.statusCode || '?'})`), context: { execution_id: $execution.id, detail: $json } }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "d4000000-0000-4000-8000-000000000006",
+      "name": "Record problem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [360, 140],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME_BACKEND", "name": "JobHunter backend (n8n key)" }
+      },
+      "notes": "Catches both a failed apply-pack call and a failed email send. Its own onError is continueRegularOutput so logging can never be the thing that breaks the run."
+    }
+  ],
+  "connections": {
+    "Hourly after generation": {
+      "main": [[{ "node": "Prepare apply packs", "type": "main", "index": 0 }]]
+    },
+    "Run now (manual)": {
+      "main": [[{ "node": "Prepare apply packs", "type": "main", "index": 0 }]]
+    },
+    "Prepare apply packs": {
+      "main": [[{ "node": "Anything to send?", "type": "main", "index": 0 }]]
+    },
+    "Anything to send?": {
+      "main": [
+        [{ "node": "Email the digest to me", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Email the digest to me": {
+      "main": [
+        [],
+        [{ "node": "Record problem", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {}
+}

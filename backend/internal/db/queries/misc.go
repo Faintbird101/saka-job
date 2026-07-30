@@ -14,6 +14,8 @@ SELECT
     COALESCE(scoring_model, ''),
     COALESCE(generation_model, ''),
     COALESCE(cover_letter_notes, ''),
+    manual_apply_grace_days,
+    COALESCE(notify_email, ''),
     updated_at
 FROM profile
 WHERE id = 1`
@@ -29,7 +31,9 @@ UPDATE profile SET
     max_jobs_per_run    = COALESCE($5, max_jobs_per_run),
     scoring_model       = COALESCE($6, scoring_model),
     generation_model    = COALESCE($7, generation_model),
-    cover_letter_notes  = COALESCE($8, cover_letter_notes)
+    cover_letter_notes  = COALESCE($8, cover_letter_notes),
+    manual_apply_grace_days = COALESCE($9, manual_apply_grace_days),
+    notify_email        = COALESCE($10, notify_email)
 WHERE id = 1
 RETURNING
     COALESCE(master_cv, ''),
@@ -40,6 +44,8 @@ RETURNING
     COALESCE(scoring_model, ''),
     COALESCE(generation_model, ''),
     COALESCE(cover_letter_notes, ''),
+    manual_apply_grace_days,
+    COALESCE(notify_email, ''),
     updated_at`
 
 // ---------- fetch_log (API quota visibility) ----------
@@ -108,3 +114,23 @@ const ClearErrors = `DELETE FROM errors`
 
 // ClearErrorsBefore removes entries older than a cutoff, for routine pruning.
 const ClearErrorsBefore = `DELETE FROM errors WHERE created_at < $1`
+
+// MarkManualApply moves an approved job to ManualApply and stamps the clock the
+// grace period runs against. A separate column from updated_at, which any later
+// edit would touch and silently restart the countdown.
+const MarkManualApply = `UPDATE jobs SET manual_apply_at = now() WHERE id = $1`
+
+// ExpireManualApply closes jobs that have sat in ManualApply past the grace
+// period. Returns what it closed so the run can report it rather than silently
+// tidying up behind you.
+const ExpireManualApply = `
+UPDATE jobs
+SET status = 'Closed'
+WHERE status = 'ManualApply'
+  AND manual_apply_at IS NOT NULL
+  -- make_interval takes an integer directly. Building the interval by string
+  -- concatenation ("$1 || ' days'") makes Postgres infer $1 as TEXT, and the
+  -- driver then cannot encode an int into it: "unable to encode 7 into text
+  -- format for text (OID 25)".
+  AND manual_apply_at < now() - make_interval(days => $1)
+RETURNING id, title, organization`

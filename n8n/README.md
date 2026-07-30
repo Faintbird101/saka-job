@@ -9,7 +9,7 @@ container's SQLite file.
 | `01_ingest.json`  | WF-A | built  | Cron → read profile → RapidAPI → `POST /internal/jobs/ingest` |
 | `02_score.json`   | WF-B | built  | `New` jobs → LLM score → `Scored` / `LowMatch` / `ScoreFailed` |
 | `03_generate.json`| WF-C | todo   | `Scored` → CV + cover letter → `AwaitingApproval` |
-| `04_send.json`    | WF-D | todo   | `Approved` → email → `Applied` |
+| `04_apply_packs.json` | WF-D | built | `Approved` → `ManualApply` + digest **to you** |
 | `05_followup.json`| WF-E | todo   | Daily → `Applied` 7d+ with no reply → `FollowUpSent` |
 
 ---

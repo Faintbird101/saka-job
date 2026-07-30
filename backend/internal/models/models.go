@@ -133,20 +133,29 @@ type Profile struct {
 	GenerationModel  string `json:"generation_model"`
 	CoverLetterNotes string `json:"cover_letter_notes"`
 
+	// ManualApplyGraceDays is how long a job may sit in ManualApply before it
+	// is closed automatically. 0 disables expiry.
+	ManualApplyGraceDays int `json:"manual_apply_grace_days"`
+	// NotifyEmail is where the apply-pack digest goes. Deliberately the
+	// candidate's own address — nothing in this pipeline emails an employer.
+	NotifyEmail string `json:"notify_email"`
+
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // ProfileUpdate is the PATCH body for the profile. Every field is a pointer so
 // "absent" and "explicitly set to empty/zero" stay distinguishable.
 type ProfileUpdate struct {
-	MasterCV          *string          `json:"master_cv"`
-	SearchTitles      *json.RawMessage `json:"search_titles"`
-	PreferredSkills   *json.RawMessage `json:"preferred_skills"`
-	MinScoreThreshold *int             `json:"min_score_threshold"`
-	MaxJobsPerRun     *int             `json:"max_jobs_per_run"`
-	ScoringModel      *string          `json:"scoring_model"`
-	GenerationModel   *string          `json:"generation_model"`
-	CoverLetterNotes  *string          `json:"cover_letter_notes"`
+	MasterCV             *string          `json:"master_cv"`
+	SearchTitles         *json.RawMessage `json:"search_titles"`
+	PreferredSkills      *json.RawMessage `json:"preferred_skills"`
+	MinScoreThreshold    *int             `json:"min_score_threshold"`
+	MaxJobsPerRun        *int             `json:"max_jobs_per_run"`
+	ScoringModel         *string          `json:"scoring_model"`
+	GenerationModel      *string          `json:"generation_model"`
+	CoverLetterNotes     *string          `json:"cover_letter_notes"`
+	ManualApplyGraceDays *int             `json:"manual_apply_grace_days"`
+	NotifyEmail          *string          `json:"notify_email"`
 }
 
 // JobUpdate is the PATCH body for a job. Same pointer rule as ProfileUpdate.

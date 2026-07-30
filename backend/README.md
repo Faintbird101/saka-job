@@ -68,9 +68,10 @@ calls `/api/jobs`; this router sees `/jobs`.
 | POST   | `/internal/jobs/ingest`     | n8n   | **WF-A**: normalize a batch, dedup, insert, log the run |
 | POST   | `/internal/scoring/run`     | n8n   | **WF-B**: score `New` jobs → `Scored`/`LowMatch` |
 | POST   | `/internal/generation/run`  | n8n   | **WF-C**: `Scored` → CV + letter → `AwaitingApproval` |
+| POST   | `/internal/apply-packs/run` | n8n   | **WF-D**: `Approved` → `ManualApply` + digest to you; expires stale entries |
 | POST   | `/internal/errors`          | n8n   | workflow error reporting |
 
-Twenty routes. `any` means either credential; `n8n` means the n8n key only.
+Twenty-one routes. `any` means either credential; `n8n` means the n8n key only.
 
 ### Ingest
 

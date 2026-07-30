@@ -99,7 +99,7 @@ func run() error {
 	// (WF-C) needs one even when scoring deliberately does not use one.
 	llm, llmModel := buildLLM(cfg, log)
 
-	svc := service.New(database, log, scorer, llm, llmModel)
+	svc := service.New(database, log, scorer, llm, llmModel, cfg.PublicBaseURL)
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: handlers.Router(cfg, database, svc, log),

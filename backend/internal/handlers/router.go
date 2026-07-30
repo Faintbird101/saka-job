@@ -86,6 +86,9 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 
 		r.Post("/internal/jobs/ingest", h.Ingest)
 		r.Post("/internal/errors", h.RecordError)
+		// WF-D: move Approved -> ManualApply and hand back a digest to notify
+		// the candidate. Never contacts an employer.
+		r.Post("/internal/apply-packs/run", h.RunApplyPacks)
 	})
 
 	// ---- n8n only, long-running ----

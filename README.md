@@ -321,7 +321,7 @@ flow) means each can be re-run from the middle and debugged in isolation.
 | WF-A | Ingest        | Cron, twice daily    | RapidAPI       | `New` jobs          |
 | WF-B | Score         | Cron / after ingest  | `New`          | `Scored`/`LowMatch` |
 | WF-C | Generate      | Cron                 | `Scored`       | `AwaitingApproval`  |
-| WF-D | Send          | Cron                 | `Approved`     | `Applied`           |
+| WF-D | Apply packs   | Cron                 | `Approved`     | `ManualApply`       |
 | WF-E | Follow-up     | Daily cron           | `Applied` 7d+  | `FollowUpSent`      |
 
 **Fetching is deliberately limited to twice a day** (e.g. cron `0 7,19 * * *`)
@@ -461,7 +461,13 @@ the way through — then widened. Recommended order:
    in the profile, so scoring and generation can use different ones — which
    also means separate daily quotas on free tiers.
 8. [ ] **Approval in the app** -> `PATCH /jobs/{id}`.
-9. [ ] **Sending + follow-ups** (WF-D, WF-E).
+9. [~] **Apply packs + follow-ups.** WF-D is built and re-scoped: across every
+   job ingested, **zero** carried a hiring-manager email address — every posting
+   is an apply URL — so an automated sender would have had nothing to send to.
+   Instead WF-D moves `Approved` → `ManualApply`, stamps a grace-period clock,
+   closes anything left unapplied past it, and emails **you** a digest with the
+   apply link and both generated documents. Nothing in this pipeline emails an
+   employer. Unpublished pending SMTP. WF-E (follow-ups) still to build.
 10. [ ] **Dashboard, audit trail, polish.**
 
 ---

@@ -24,6 +24,7 @@ func (s *Service) GetProfile(ctx context.Context) (models.Profile, error) {
 		&p.MasterCV, &titles, &skills,
 		&p.MinScoreThreshold, &p.MaxJobsPerRun,
 		&p.ScoringModel, &p.GenerationModel, &p.CoverLetterNotes,
+		&p.ManualApplyGraceDays, &p.NotifyEmail,
 		&p.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -49,6 +50,9 @@ func (s *Service) UpdateProfile(ctx context.Context, patch models.ProfileUpdate)
 	if patch.MinScoreThreshold != nil && (*patch.MinScoreThreshold < 0 || *patch.MinScoreThreshold > 100) {
 		return models.Profile{}, fmt.Errorf("%w: min_score_threshold must be between 0 and 100", ErrInvalidInput)
 	}
+	if patch.ManualApplyGraceDays != nil && (*patch.ManualApplyGraceDays < 0 || *patch.ManualApplyGraceDays > 365) {
+		return models.Profile{}, fmt.Errorf("%w: manual_apply_grace_days must be between 0 and 365 (0 disables expiry)", ErrInvalidInput)
+	}
 	if patch.MaxJobsPerRun != nil && (*patch.MaxJobsPerRun < 1 || *patch.MaxJobsPerRun > 100) {
 		return models.Profile{}, fmt.Errorf("%w: max_jobs_per_run must be between 1 and 100", ErrInvalidInput)
 	}
@@ -71,8 +75,11 @@ func (s *Service) UpdateProfile(ctx context.Context, patch models.ProfileUpdate)
 		patch.ScoringModel,
 		patch.GenerationModel,
 		patch.CoverLetterNotes,
+		patch.ManualApplyGraceDays,
+		patch.NotifyEmail,
 	).Scan(&p.MasterCV, &titles, &skills, &p.MinScoreThreshold, &p.MaxJobsPerRun,
-		&p.ScoringModel, &p.GenerationModel, &p.CoverLetterNotes, &p.UpdatedAt)
+		&p.ScoringModel, &p.GenerationModel, &p.CoverLetterNotes,
+		&p.ManualApplyGraceDays, &p.NotifyEmail, &p.UpdatedAt)
 	if err != nil {
 		return models.Profile{}, fmt.Errorf("update profile: %w", err)
 	}

@@ -29,6 +29,10 @@ type Config struct {
 	// far longer than any other endpoint should be allowed to take.
 	ScoringTimeout time.Duration
 
+	// PublicBaseURL is how the API is reached from outside the Docker network.
+	// Used to build clickable links in notifications.
+	PublicBaseURL string
+
 	// Postgres
 	DatabaseURL string
 
@@ -75,6 +79,8 @@ func Load() (Config, error) {
 		Port:      getDefault("API_PORT", "2623"),
 		LogLevel:  getDefault("LOG_LEVEL", "info"),
 		LogFormat: getDefault("LOG_FORMAT", "json"),
+
+		PublicBaseURL: getDefault("PUBLIC_BASE_URL", "https://api.sakajob.home:7443"),
 
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 

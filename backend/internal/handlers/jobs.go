@@ -215,3 +215,28 @@ func (h *Handler) serveDocument(w http.ResponseWriter, r *http.Request, which st
 	w.Header().Set("X-Generated-At", generatedAt.UTC().Format(time.RFC3339))
 	_, _ = w.Write([]byte(doc))
 }
+
+// RunApplyPacks handles POST /internal/apply-packs/run — WF-D's entry point.
+//
+// It does not send anything to employers. It moves Approved jobs to
+// ManualApply and returns a digest for n8n to deliver to YOU; see
+// service.PrepareApplyPacks for why the original email-sending design does not
+// survive contact with the data.
+func (h *Handler) RunApplyPacks(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Limit int `json:"limit"`
+	}
+	if r.ContentLength > 0 {
+		if err := decodeJSON(w, r, &body); err != nil {
+			h.badRequest(w, r, "invalid request body: "+err.Error())
+			return
+		}
+	}
+
+	run, err := h.svc.PrepareApplyPacks(r.Context(), body.Limit)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	h.writeJSON(w, r, http.StatusOK, run)
+}

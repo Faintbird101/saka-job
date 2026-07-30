@@ -49,11 +49,16 @@ type Service struct {
 	// generation is a supported, and probably the preferred, combination.
 	llm      scoring.Client
 	llmModel string
+
+	// publicBase is the externally reachable origin (behind Caddy). The
+	// process cannot infer it, and without it the apply-pack digest would
+	// carry bare paths that nobody can click from a mail client.
+	publicBase string
 }
 
 // New builds a Service. scorer and llm may each be nil.
-func New(database *db.DB, log *slog.Logger, scorer scoring.Scorer, llm scoring.Client, llmModel string) *Service {
-	return &Service{db: database, log: log, scorer: scorer, llm: llm, llmModel: llmModel}
+func New(database *db.DB, log *slog.Logger, scorer scoring.Scorer, llm scoring.Client, llmModel, publicBase string) *Service {
+	return &Service{db: database, log: log, scorer: scorer, llm: llm, llmModel: llmModel, publicBase: publicBase}
 }
 
 // row is the subset of pgx.Row / pgx.Rows that scanJob needs, so the same
