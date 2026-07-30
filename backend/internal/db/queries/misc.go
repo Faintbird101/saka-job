@@ -16,6 +16,7 @@ SELECT
     COALESCE(cover_letter_notes, ''),
     manual_apply_grace_days,
     COALESCE(notify_email, ''),
+    inbox_auto_confidence,
     updated_at
 FROM profile
 WHERE id = 1`
@@ -33,7 +34,8 @@ UPDATE profile SET
     generation_model    = COALESCE($7, generation_model),
     cover_letter_notes  = COALESCE($8, cover_letter_notes),
     manual_apply_grace_days = COALESCE($9, manual_apply_grace_days),
-    notify_email        = COALESCE($10, notify_email)
+    notify_email        = COALESCE($10, notify_email),
+    inbox_auto_confidence = COALESCE($11, inbox_auto_confidence)
 WHERE id = 1
 RETURNING
     COALESCE(master_cv, ''),
@@ -46,6 +48,7 @@ RETURNING
     COALESCE(cover_letter_notes, ''),
     manual_apply_grace_days,
     COALESCE(notify_email, ''),
+    inbox_auto_confidence,
     updated_at`
 
 // ---------- fetch_log (API quota visibility) ----------

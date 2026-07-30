@@ -150,6 +150,9 @@ type Profile struct {
 	// NotifyEmail is where the apply-pack digest goes. Deliberately the
 	// candidate's own address — nothing in this pipeline emails an employer.
 	NotifyEmail string `json:"notify_email"`
+	// InboxAutoConfidence is the floor below which a classification is only
+	// ever suggested, never applied.
+	InboxAutoConfidence int `json:"inbox_auto_confidence"`
 
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -166,6 +169,7 @@ type ProfileUpdate struct {
 	GenerationModel      *string          `json:"generation_model"`
 	CoverLetterNotes     *string          `json:"cover_letter_notes"`
 	ManualApplyGraceDays *int             `json:"manual_apply_grace_days"`
+	InboxAutoConfidence  *int             `json:"inbox_auto_confidence"`
 	NotifyEmail          *string          `json:"notify_email"`
 }
 
@@ -181,6 +185,40 @@ type JobUpdate struct {
 	PromptUsed     *string          `json:"prompt_used"`
 	EmailUsed      *string          `json:"email_used"`
 	DateApplied    *time.Time       `json:"date_applied"`
+}
+
+// JobEvent is one inbound email matched (or not) to an application.
+//
+// Kept as its own table rather than columns on the job because a single
+// application can accumulate several replies — acknowledgement, then interview,
+// then offer — and flattening them onto the row would lose all but the last.
+type JobEvent struct {
+	ID     string  `json:"id"`
+	JobID  *string `json:"job_id"`
+	Source string  `json:"source"`
+
+	Kind       string `json:"kind"`
+	Confidence int    `json:"confidence"`
+	Classifier string `json:"classifier"`
+
+	Sender       string `json:"sender"`
+	SenderDomain string `json:"sender_domain"`
+	Subject      string `json:"subject"`
+	// Excerpt is a fragment, not the whole body — see service.excerptOf.
+	Excerpt    string     `json:"excerpt"`
+	ReceivedAt *time.Time `json:"received_at"`
+
+	MatchScore  int    `json:"match_score"`
+	MatchReason string `json:"match_reason"`
+
+	// SuggestedStatus is empty when the email implies no change.
+	SuggestedStatus string `json:"suggested_status,omitempty"`
+	// Confirmed is nil while a suggestion awaits your decision.
+	Confirmed *bool      `json:"confirmed"`
+	AppliedAt *time.Time `json:"applied_at"`
+
+	MessageID string    `json:"message_id,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // ErrorRecord is one row of the application error log.

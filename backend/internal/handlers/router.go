@@ -53,6 +53,12 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 		// they are prose meant to be read and edited.
 		r.Get("/jobs/{id}/cv", h.GetCV)
 		r.Get("/jobs/{id}/cover-letter", h.GetCoverLetter)
+		// Inbound-reply timeline, and the queue of classifications awaiting a
+		// human decision.
+		r.Get("/jobs/{id}/events", h.JobEvents)
+		r.Get("/events/pending", h.PendingEvents)
+		r.Get("/events/unmatched", h.UnmatchedEvents)
+		r.Post("/events/{id}/confirm", h.ConfirmEvent)
 		// PATCH is shared on purpose: the app writes Approved/Rejected here and
 		// n8n writes score and CV URLs through the same validated path, so the
 		// state machine is enforced once rather than twice.
@@ -86,6 +92,8 @@ func Router(cfg config.Config, database *db.DB, svc *service.Service, log *slog.
 
 		r.Post("/internal/jobs/ingest", h.Ingest)
 		r.Post("/internal/errors", h.RecordError)
+		// WF-F: n8n fetches the mail, the backend matches and classifies it.
+		r.Post("/internal/inbox/scan", h.ScanInbox)
 		// WF-D: move Approved -> ManualApply and hand back a digest to notify
 		// the candidate. Never contacts an employer.
 		r.Post("/internal/apply-packs/run", h.RunApplyPacks)

@@ -24,7 +24,7 @@ func (s *Service) GetProfile(ctx context.Context) (models.Profile, error) {
 		&p.MasterCV, &titles, &skills,
 		&p.MinScoreThreshold, &p.MaxJobsPerRun,
 		&p.ScoringModel, &p.GenerationModel, &p.CoverLetterNotes,
-		&p.ManualApplyGraceDays, &p.NotifyEmail,
+		&p.ManualApplyGraceDays, &p.NotifyEmail, &p.InboxAutoConfidence,
 		&p.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -77,9 +77,10 @@ func (s *Service) UpdateProfile(ctx context.Context, patch models.ProfileUpdate)
 		patch.CoverLetterNotes,
 		patch.ManualApplyGraceDays,
 		patch.NotifyEmail,
+		patch.InboxAutoConfidence,
 	).Scan(&p.MasterCV, &titles, &skills, &p.MinScoreThreshold, &p.MaxJobsPerRun,
 		&p.ScoringModel, &p.GenerationModel, &p.CoverLetterNotes,
-		&p.ManualApplyGraceDays, &p.NotifyEmail, &p.UpdatedAt)
+		&p.ManualApplyGraceDays, &p.NotifyEmail, &p.InboxAutoConfidence, &p.UpdatedAt)
 	if err != nil {
 		return models.Profile{}, fmt.Errorf("update profile: %w", err)
 	}

@@ -16,6 +16,13 @@ const (
 	StatusManualApply      = "ManualApply"
 	StatusFollowUpSent     = "FollowUpSent"
 	StatusClosed           = "Closed"
+
+	// Driven by inbound email (0004). EmployerRejected is deliberately NOT
+	// StatusRejected: that one means YOU declined the job.
+	StatusAcknowledged     = "Acknowledged"
+	StatusInterviewing     = "Interviewing"
+	StatusOfferReceived    = "OfferReceived"
+	StatusEmployerRejected = "EmployerRejected"
 )
 
 // AllStatuses is every legal value, in pipeline order.
@@ -23,6 +30,7 @@ var AllStatuses = []string{
 	StatusNew, StatusScored, StatusCVGenerated, StatusAwaitingApproval,
 	StatusApproved, StatusApplied, StatusFollowUpSent, StatusClosed,
 	StatusLowMatch, StatusRejected, StatusScoreFailed, StatusManualApply,
+	StatusAcknowledged, StatusInterviewing, StatusOfferReceived, StatusEmployerRejected,
 }
 
 // allowedTransitions is the edge list of the state machine.
@@ -40,10 +48,18 @@ var allowedTransitions = map[string][]string{
 	StatusAwaitingApproval: {StatusApproved, StatusRejected, StatusCVGenerated},
 	StatusApproved:         {StatusApplied, StatusManualApply, StatusRejected},
 	StatusRejected:         {StatusClosed},
-	StatusApplied:          {StatusFollowUpSent, StatusClosed},
-	StatusManualApply:      {StatusApplied, StatusClosed},
-	StatusFollowUpSent:     {StatusClosed, StatusFollowUpSent},
-	StatusClosed:           {},
+	// An application can be acknowledged, then advance, then conclude. Every
+	// one of these is driven by a reply landing in the inbox.
+	StatusApplied:      {StatusFollowUpSent, StatusClosed, StatusAcknowledged, StatusInterviewing, StatusOfferReceived, StatusEmployerRejected},
+	StatusAcknowledged: {StatusInterviewing, StatusOfferReceived, StatusEmployerRejected, StatusFollowUpSent, StatusClosed},
+	StatusInterviewing: {StatusOfferReceived, StatusEmployerRejected, StatusClosed, StatusInterviewing},
+	// Terminal-ish: an offer is either accepted (Closed) or, rarely, withdrawn.
+	StatusOfferReceived:    {StatusClosed, StatusEmployerRejected},
+	StatusEmployerRejected: {StatusClosed},
+	StatusManualApply:      {StatusApplied, StatusClosed, StatusAcknowledged, StatusEmployerRejected},
+	// A follow-up can still be answered.
+	StatusFollowUpSent: {StatusClosed, StatusFollowUpSent, StatusAcknowledged, StatusInterviewing, StatusOfferReceived, StatusEmployerRejected},
+	StatusClosed:       {},
 }
 
 // IsValidStatus reports whether s is one of the twelve legal statuses.
