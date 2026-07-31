@@ -1,24 +1,70 @@
-name: jobhunter
-description: Manage the automated job application pipeline.
+name: saka_job
+description: "Your agent applies. You just say yes."
 publish_to: "none"
-version: 0.1.0
+version: 0.1.0+1
 
 environment:
-  sdk: ">=3.3.0 <4.0.0"
+  sdk: ">=3.9.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  # add as you go:
-  # dio: ^5.x            (http client)
-  # flutter_riverpod: ^2.x  (state)
-  # go_router: ^14.x     (navigation)
-  # freezed_annotation / json_annotation (models)
+  flutter_localizations:
+    sdk: flutter
+
+  # ---- state, routing, DI ----
+  # GetX carries all three. Controllers hold screen state, services wrap the
+  # API, and nothing in the widget tree ever sees an endpoint.
+  get: ^4.7.2
+
+  # ---- network ----
+  dio: ^5.9.0
+  # Session tokens go here, not in SharedPreferences: it is backed by the
+  # Android Keystore / iOS Keychain, so a rooted-device dump does not hand over
+  # a working login.
+  flutter_secure_storage: ^9.2.4
+  # Non-secret preferences (theme, locale) that would be pointless to encrypt.
+  shared_preferences: ^2.5.3
+
+  # ---- UI ----
+  google_fonts: ^6.3.2
+  material_design_icons_flutter: ^7.0.7296
+  toastification: ^3.0.4
+  # Skeletons rather than spinners: a shape that matches the content that is
+  # coming reads as "nearly there" instead of "something is happening".
+  shimmer: ^3.0.0
+  # Renders the generated CV and cover letter, which the API serves as markdown.
+  flutter_markdown_plus: ^1.0.3
+  # In-app browser for job postings — the requirement is never to bounce the
+  # user out to another app.
+  flutter_inappwebview: ^6.1.5
+
+  # ---- platform ----
+  firebase_core: ^3.15.2
+  firebase_messaging: ^15.2.10
+  flutter_local_notifications: ^18.0.1
+  package_info_plus: ^8.3.1
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  # build_runner, freezed, json_serializable
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
+  # Regenerates the localisation classes from the .arb files on every build, so
+  # adding a string is one edit rather than an edit plus a codegen command that
+  # someone will forget.
+  generate: true
+  assets:
+    - assets/images/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/images/app_icon.png"
+  adaptive_icon_background: "#2189C9"
+  adaptive_icon_foreground: "assets/images/app_icon_foreground.png"

@@ -1,0 +1,8 @@
+# Drives `flutter gen-l10n`, which also runs automatically on build because
+# pubspec sets `generate: true`. Adding a string means editing the .arb files
+# and nothing else.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: L10n
+nullable-getter: false
