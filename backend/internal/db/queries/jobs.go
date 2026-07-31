@@ -53,6 +53,8 @@ const JobColumns = `
     COALESCE(prompt_used, ''),
     date_applied,
     COALESCE(email_used, ''),
+    score_axes,
+    cv_edits,
     generated_at,
     COALESCE(generated_by, ''),
     created_at,
@@ -101,6 +103,8 @@ const ListJobColumns = `
     '' AS prompt_used,
     date_applied,
     COALESCE(email_used, ''),
+    score_axes,
+    cv_edits,
     generated_at,
     COALESCE(generated_by, ''),
     created_at,
@@ -193,7 +197,9 @@ UPDATE jobs SET
     cover_letter_url = COALESCE($8,  cover_letter_url),
     prompt_used      = COALESCE($9,  prompt_used),
     email_used       = COALESCE($10, email_used),
-    date_applied     = COALESCE($11, date_applied)
+    date_applied     = COALESCE($11, date_applied),
+    score_axes       = COALESCE($12, score_axes),
+    cv_edits         = COALESCE($13, cv_edits)
 WHERE id = $1
 RETURNING ` + JobColumns
 
@@ -223,6 +229,7 @@ LIMIT $2`
 // which keeps them meaningful now that the documents live in the row.
 const StoreDocuments = `
 UPDATE jobs SET
+    cv_edits          = $7,
     cv_text           = $2,
     cover_letter_text = $3,
     generated_by      = $4,
@@ -240,6 +247,6 @@ FROM jobs WHERE id = $1`
 // path uses it; see service.forceStatus for why that exception exists.
 const ForceStatus = `
 UPDATE jobs SET status = $2, score = NULL, matched_skills = NULL,
-    missing_skills = NULL, ai_summary = NULL
+    missing_skills = NULL, ai_summary = NULL, score_axes = NULL
 WHERE id = $1
 RETURNING ` + JobColumns

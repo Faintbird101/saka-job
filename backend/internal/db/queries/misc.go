@@ -23,6 +23,15 @@ SELECT
     push_on_reply,
     push_on_followup,
     push_on_failure,
+    COALESCE(preferred_locations, '[]'::jsonb),
+    COALESCE(remote_preference, 'any'),
+    salary_floor,
+    COALESCE(salary_currency, 'KES'),
+    weight_skills,
+    weight_seniority,
+    weight_domain,
+    weight_location,
+    weight_pay,
     updated_at
 FROM profile
 WHERE id = 1`
@@ -47,7 +56,16 @@ UPDATE profile SET
     push_on_approval = COALESCE($14, push_on_approval),
     push_on_reply = COALESCE($15, push_on_reply),
     push_on_followup = COALESCE($16, push_on_followup),
-    push_on_failure = COALESCE($17, push_on_failure)
+    push_on_failure = COALESCE($17, push_on_failure),
+    preferred_locations = COALESCE($18, preferred_locations),
+    remote_preference = COALESCE($19, remote_preference),
+    salary_floor = COALESCE($20, salary_floor),
+    salary_currency = COALESCE($21, salary_currency),
+    weight_skills = COALESCE($22, weight_skills),
+    weight_seniority = COALESCE($23, weight_seniority),
+    weight_domain = COALESCE($24, weight_domain),
+    weight_location = COALESCE($25, weight_location),
+    weight_pay = COALESCE($26, weight_pay)
 WHERE id = 1
 RETURNING
     COALESCE(master_cv, ''),
@@ -67,6 +85,15 @@ RETURNING
     push_on_reply,
     push_on_followup,
     push_on_failure,
+    COALESCE(preferred_locations, '[]'::jsonb),
+    COALESCE(remote_preference, 'any'),
+    salary_floor,
+    COALESCE(salary_currency, 'KES'),
+    weight_skills,
+    weight_seniority,
+    weight_domain,
+    weight_location,
+    weight_pay,
     updated_at`
 
 // ---------- fetch_log (API quota visibility) ----------

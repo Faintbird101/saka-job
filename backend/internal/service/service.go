@@ -75,7 +75,7 @@ type row interface {
 // obvious. If this grows a third variant, it's time for sqlc.
 func scanJob(r row) (models.Job, error) {
 	var j models.Job
-	var keySkills, keywords, matched, missing []byte
+	var keySkills, keywords, matched, missing, axesRaw, editsRaw []byte
 
 	err := r.Scan(
 		&j.ID,
@@ -117,6 +117,8 @@ func scanJob(r row) (models.Job, error) {
 		&j.PromptUsed,
 		&j.DateApplied,
 		&j.EmailUsed,
+		&axesRaw,
+		&editsRaw,
 		&j.GeneratedAt,
 		&j.GeneratedBy,
 		&j.CreatedAt,
@@ -133,6 +135,14 @@ func scanJob(r row) (models.Job, error) {
 	j.AIKeywords = jsonOr(keywords, "[]")
 	j.MatchedSkills = jsonOr(matched, "[]")
 	j.MissingSkills = jsonOr(missing, "[]")
+	// Left nil rather than defaulted: a job scored before axes existed has no
+	// breakdown, and the app must show that honestly instead of five zeros.
+	if len(axesRaw) > 0 {
+		j.ScoreAxes = json.RawMessage(axesRaw)
+	}
+	if len(editsRaw) > 0 {
+		j.CVEdits = json.RawMessage(editsRaw)
+	}
 	return j, nil
 }
 

@@ -85,21 +85,28 @@ func (k *KeywordScorer) Score(_ context.Context, p models.Profile, j models.Job)
 		}
 	}
 
-	score := k.combine(len(matched), len(required), keywordHits, len(keywords), p, j)
+	axes := k.axes(len(matched), len(required), keywordHits, len(keywords), p, j)
+	score := Combine(axes, WeightsFrom(p))
 
 	sort.Strings(matched)
 	sort.Strings(missing)
 
 	return Result{
 		Score:         score,
+		Axes:          axes,
 		MatchedSkills: nonNil(matched),
 		MissingSkills: nonNil(missing),
 		Summary:       buildSummary(score, matched, missing, j),
 	}, nil
 }
 
-// combine turns the raw counts into a 0-100 score.
-func (k *KeywordScorer) combine(matched, required, kwHits, kwTotal int, p models.Profile, j models.Job) int {
+// axes breaks the match into its five components.
+//
+// The scorer already computed skills, title and seniority internally and threw
+// the detail away by folding them into one number. Surfacing them is most of
+// what the breakdown needed; location and pay are the genuinely new parts, and
+// both stay nil when the profile or the posting is silent.
+func (k *KeywordScorer) axes(matched, required, kwHits, kwTotal int, p models.Profile, j models.Job) Axes {
 	// --- skills (70) ---
 	//
 	// Two signals, blended, because neither works alone:
@@ -132,18 +139,16 @@ func (k *KeywordScorer) combine(matched, required, kwHits, kwTotal int, p models
 	if required > 0 && kwTotal > 0 {
 		skillFraction = min(1.0, skillFraction+0.15*float64(kwHits)/float64(kwTotal))
 	}
-	total := skillFraction * weightSkills
-
-	// --- title (20) ---
-	// Does the posting's title look like something the candidate is searching
-	// for? This is what separates a Flutter role from a React role that merely
-	// lists Dart somewhere.
-	total += titleScore(jsonList(p.SearchTitles), j.Title) * weightTitle
-
-	// --- seniority (10) ---
-	total += seniorityScore(p.MasterCV, j) * weightSeniority
-
-	return clamp(int(total + 0.5))
+	return Axes{
+		Skills: axis(clamp(int(skillFraction*100 + 0.5))),
+		// "Domain" in the app is this: does the posting's title look like the
+		// kind of role the candidate is actually searching for? It is what
+		// separates a Flutter role from a React role that merely lists Dart.
+		Domain:    axis(clamp(int(titleScore(jsonList(p.SearchTitles), j.Title)*100 + 0.5))),
+		Seniority: axis(clamp(int(seniorityScore(p.MasterCV, j)*100 + 0.5))),
+		Location:  locationAxis(p, j),
+		Pay:       payAxis(p, j),
+	}
 }
 
 // titleScore returns 1.0 for a title containing one of the searched-for terms,

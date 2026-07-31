@@ -148,6 +148,8 @@ func (s *Service) UpdateJob(ctx context.Context, id string, patch models.JobUpda
 		patch.PromptUsed,
 		patch.EmailUsed,
 		patch.DateApplied,
+		rawOrNil(patch.ScoreAxes),
+		rawOrNil(patch.CVEdits),
 	))
 	if err != nil {
 		return models.Job{}, err

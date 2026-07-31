@@ -119,6 +119,12 @@ type Job struct {
 	GeneratedAt     *time.Time `json:"generated_at,omitempty"`
 	GeneratedBy     string     `json:"generated_by,omitempty"`
 
+	// ScoreAxes is the breakdown behind Score; CVEdits is what the generator
+	// changed and why. Both exist so the app can show its work rather than
+	// asking you to trust a number and a rewritten document.
+	ScoreAxes json.RawMessage `json:"score_axes,omitempty"`
+	CVEdits   json.RawMessage `json:"cv_edits,omitempty"`
+
 	// RawPayload is the untouched API item, kept so a scoring or generation
 	// bug can be replayed without burning another API call from the quota.
 	RawPayload json.RawMessage `json:"raw_payload,omitempty"`
@@ -160,6 +166,21 @@ type Profile struct {
 	PushOnFollowUp bool `json:"push_on_followup"`
 	PushOnFailure  bool `json:"push_on_failure"`
 
+	// Inputs for the location and pay axes. Without these both stay unknown,
+	// because scoring them against nothing would be invention.
+	PreferredLocations json.RawMessage `json:"preferred_locations"`
+	RemotePreference   string          `json:"remote_preference"`
+	SalaryFloor        int             `json:"salary_floor"`
+	SalaryCurrency     string          `json:"salary_currency"`
+
+	// Per-axis weights. They need not sum to 100 — the scorer normalises by
+	// whatever applied, so a 0 removes an axis cleanly.
+	WeightSkills    int `json:"weight_skills"`
+	WeightSeniority int `json:"weight_seniority"`
+	WeightDomain    int `json:"weight_domain"`
+	WeightLocation  int `json:"weight_location"`
+	WeightPay       int `json:"weight_pay"`
+
 	// FollowUpAfterDays is how long to wait after applying before chasing.
 	// FollowUpCloseDays is how long after chasing to give up; 0 disables it.
 	FollowUpAfterDays int `json:"followup_after_days"`
@@ -187,6 +208,15 @@ type ProfileUpdate struct {
 	PushOnReply          *bool            `json:"push_on_reply"`
 	PushOnFollowUp       *bool            `json:"push_on_followup"`
 	PushOnFailure        *bool            `json:"push_on_failure"`
+	PreferredLocations   *json.RawMessage `json:"preferred_locations"`
+	RemotePreference     *string          `json:"remote_preference"`
+	SalaryFloor          *int             `json:"salary_floor"`
+	SalaryCurrency       *string          `json:"salary_currency"`
+	WeightSkills         *int             `json:"weight_skills"`
+	WeightSeniority      *int             `json:"weight_seniority"`
+	WeightDomain         *int             `json:"weight_domain"`
+	WeightLocation       *int             `json:"weight_location"`
+	WeightPay            *int             `json:"weight_pay"`
 	NotifyEmail          *string          `json:"notify_email"`
 }
 
@@ -202,6 +232,8 @@ type JobUpdate struct {
 	PromptUsed     *string          `json:"prompt_used"`
 	EmailUsed      *string          `json:"email_used"`
 	DateApplied    *time.Time       `json:"date_applied"`
+	ScoreAxes      *json.RawMessage `json:"score_axes"`
+	CVEdits        *json.RawMessage `json:"cv_edits"`
 }
 
 // JobEvent is one inbound email matched (or not) to an application.

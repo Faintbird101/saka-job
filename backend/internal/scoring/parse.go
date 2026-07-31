@@ -9,7 +9,10 @@ import (
 
 // Result is a validated score for one job.
 type Result struct {
-	Score         int      `json:"score"`
+	Score int `json:"score"`
+	// Axes is the score broken down. Populated by the keyword scorer always,
+	// and by the LLM scorer when the model returns them.
+	Axes          Axes     `json:"axes"`
 	MatchedSkills []string `json:"matched_skills"`
 	MissingSkills []string `json:"missing_skills"`
 	Summary       string   `json:"summary"`

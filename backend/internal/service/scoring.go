@@ -199,6 +199,11 @@ func (s *Service) applyScore(ctx context.Context, profile models.Profile, job mo
 		MissingSkills: &missingRaw,
 		AISummary:     &r.Summary,
 	}
+	// The breakdown is what lets the app show its work rather than presenting
+	// a bare number.
+	if axesJSON := r.Axes.JSON(); len(axesJSON) > 0 && string(axesJSON) != "null" {
+		update.ScoreAxes = &axesJSON
+	}
 	// prompt_used is the audit trail for "why did this get 42?". Only the LLM
 	// path has one; leaving it nil in keyword mode keeps the column honest
 	// rather than storing a reconstruction that was never actually sent.

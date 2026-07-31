@@ -18,7 +18,7 @@ import (
 // GetProfile reads the singleton settings row.
 func (s *Service) GetProfile(ctx context.Context) (models.Profile, error) {
 	var p models.Profile
-	var titles, skills []byte
+	var titles, skills, locations []byte
 
 	err := s.db.Pool.QueryRow(ctx, queries.GetProfile).Scan(
 		&p.MasterCV, &titles, &skills,
@@ -27,6 +27,8 @@ func (s *Service) GetProfile(ctx context.Context) (models.Profile, error) {
 		&p.ManualApplyGraceDays, &p.NotifyEmail, &p.InboxAutoConfidence,
 		&p.FollowUpAfterDays, &p.FollowUpCloseDays,
 		&p.PushOnApproval, &p.PushOnReply, &p.PushOnFollowUp, &p.PushOnFailure,
+		&locations, &p.RemotePreference, &p.SalaryFloor, &p.SalaryCurrency,
+		&p.WeightSkills, &p.WeightSeniority, &p.WeightDomain, &p.WeightLocation, &p.WeightPay,
 		&p.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -39,6 +41,7 @@ func (s *Service) GetProfile(ctx context.Context) (models.Profile, error) {
 
 	p.SearchTitles = jsonOr(titles, "[]")
 	p.PreferredSkills = jsonOr(skills, "[]")
+	p.PreferredLocations = jsonOr(locations, "[]")
 	return p, nil
 }
 
@@ -66,7 +69,7 @@ func (s *Service) UpdateProfile(ctx context.Context, patch models.ProfileUpdate)
 	}
 
 	var p models.Profile
-	var titles, skills []byte
+	var titles, skills, locations2 []byte
 
 	err := s.db.Pool.QueryRow(ctx, queries.UpdateProfile,
 		patch.MasterCV,
@@ -86,16 +89,29 @@ func (s *Service) UpdateProfile(ctx context.Context, patch models.ProfileUpdate)
 		patch.PushOnReply,
 		patch.PushOnFollowUp,
 		patch.PushOnFailure,
+		rawOrNil(patch.PreferredLocations),
+		patch.RemotePreference,
+		patch.SalaryFloor,
+		patch.SalaryCurrency,
+		patch.WeightSkills,
+		patch.WeightSeniority,
+		patch.WeightDomain,
+		patch.WeightLocation,
+		patch.WeightPay,
 	).Scan(&p.MasterCV, &titles, &skills, &p.MinScoreThreshold, &p.MaxJobsPerRun,
 		&p.ScoringModel, &p.GenerationModel, &p.CoverLetterNotes,
 		&p.ManualApplyGraceDays, &p.NotifyEmail, &p.InboxAutoConfidence, &p.FollowUpAfterDays, &p.FollowUpCloseDays,
-		&p.PushOnApproval, &p.PushOnReply, &p.PushOnFollowUp, &p.PushOnFailure, &p.UpdatedAt)
+		&p.PushOnApproval, &p.PushOnReply, &p.PushOnFollowUp, &p.PushOnFailure,
+		&locations2, &p.RemotePreference, &p.SalaryFloor, &p.SalaryCurrency,
+		&p.WeightSkills, &p.WeightSeniority, &p.WeightDomain, &p.WeightLocation, &p.WeightPay,
+		&p.UpdatedAt)
 	if err != nil {
 		return models.Profile{}, fmt.Errorf("update profile: %w", err)
 	}
 
 	p.SearchTitles = jsonOr(titles, "[]")
 	p.PreferredSkills = jsonOr(skills, "[]")
+	p.PreferredLocations = jsonOr(locations2, "[]")
 	return p, nil
 }
 
