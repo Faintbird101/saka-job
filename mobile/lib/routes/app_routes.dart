@@ -9,6 +9,7 @@ abstract final class Routes {
   static const triage = '/triage';
   static const replies = '/replies';
   static const documents = '/documents';
+  static const masterCv = '/master-cv';
   static const document = '/document';
   static const settings = '/settings';
   static const notifications = '/notifications';

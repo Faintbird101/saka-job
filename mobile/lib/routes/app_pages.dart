@@ -13,7 +13,9 @@ import '../features/job_detail/views/documents_screen.dart';
 import '../features/job_detail/views/job_detail_screen.dart';
 import '../features/dashboard/controllers/pipeline_controller.dart';
 import '../features/jobs/controllers/jobs_controller.dart';
+import '../features/profile/controllers/cv_controller.dart';
 import '../features/profile/controllers/profile_controller.dart';
+import '../features/profile/views/cv_screen.dart';
 import '../features/shell/shell_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../data/models/job.dart';
@@ -58,6 +60,13 @@ abstract final class AppPages {
             initial: args?['job'] as Job?,
           ),
         );
+      }),
+    ),
+    GetPage(
+      name: Routes.masterCv,
+      page: () => const CvScreen(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<CvController>(CvController.new);
       }),
     ),
     GetPage(

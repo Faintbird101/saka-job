@@ -85,6 +85,10 @@ class ProfileScreen extends GetView<ProfileController> {
 
                 // ---- master CV ----
                 _Card(
+                  onTap: () async {
+                    await Get.toNamed<void>(Routes.masterCv);
+                    await controller.load();
+                  },
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -95,6 +99,13 @@ class ProfileScreen extends GetView<ProfileController> {
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
                               child: Text(l.masterCv, style: text.titleMedium)),
+                          Text(
+                            (profile?.hasCv ?? false) ? l.replace : l.upload,
+                            style: text.labelMedium
+                                ?.copyWith(color: AppColors.primary),
+                          ),
+                          Icon(Icons.chevron_right_rounded,
+                              size: 18, color: AppColors.primary),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.md),
@@ -197,14 +208,15 @@ class ProfileScreen extends GetView<ProfileController> {
 }
 
 class _Card extends StatelessWidget {
-  const _Card({required this.child});
+  const _Card({required this.child, this.onTap});
 
   final Widget child;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
+    final body = Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -213,6 +225,16 @@ class _Card extends StatelessWidget {
         boxShadow: dark ? AppShadows.cardDark : AppShadows.card,
       ),
       child: child,
+    );
+
+    if (onTap == null) return body;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadii.cardShape,
+        child: body,
+      ),
     );
   }
 }

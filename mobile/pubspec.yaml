@@ -38,6 +38,9 @@ dependencies:
   # In-app browser for job postings — the requirement is never to bounce the
   # user out to another app.
   flutter_inappwebview: ^6.1.5
+  # Picking a CV from storage. Scoped to the three types the backend parses, so
+  # the picker cannot hand back a file that will be rejected server-side.
+  file_picker: ^8.3.7
 
   # ---- platform ----
   firebase_core: ^3.15.2
