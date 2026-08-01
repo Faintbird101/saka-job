@@ -43,7 +43,7 @@ func testJob() models.Job {
 }
 
 func TestSplitExtractsBothDocuments(t *testing.T) {
-	cv, letter, err := Split("===CV===\n# Victor\nFlutter dev.\n===COVER_LETTER===\nDear WorkBuddy team,\nI'd like to apply.")
+	cv, letter, _, err := Split("===CV===\n# Victor\nFlutter dev.\n===COVER_LETTER===\nDear WorkBuddy team,\nI'd like to apply.")
 	if err != nil {
 		t.Fatalf("Split: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestSplitTolerantOfPackaging(t *testing.T) {
 	}
 	for name, reply := range cases {
 		t.Run(name, func(t *testing.T) {
-			cv, letter, err := Split(reply)
+			cv, letter, _, err := Split(reply)
 			if err != nil {
 				t.Fatalf("Split: %v", err)
 			}
@@ -95,7 +95,7 @@ func TestSplitRejectsIncompleteOutput(t *testing.T) {
 	}
 	for name, reply := range cases {
 		t.Run(name, func(t *testing.T) {
-			if _, _, err := Split(reply); !errors.Is(err, ErrEmptyOutput) {
+			if _, _, _, err := Split(reply); !errors.Is(err, ErrEmptyOutput) {
 				t.Errorf("want ErrEmptyOutput, got %v", err)
 			}
 		})
@@ -164,5 +164,160 @@ func TestGeneratePropagatesClientErrors(t *testing.T) {
 
 	if _, err := Generate(context.Background(), c, "m", testProfile(), testJob()); !errors.Is(err, sentinel) {
 		t.Errorf("client error was not propagated: %v", err)
+	}
+}
+
+func TestSplitParsesTheEditList(t *testing.T) {
+	reply := `===CV===
+CV body
+===COVER_LETTER===
+Letter body
+===EDITS===
+[{"section":"Summary","before":"Backend engineer with 7 years",
+  "after":"Backend engineer building payment systems","reason":"matches payments"}]`
+
+	cv, letter, edits, err := Split(reply)
+	if err != nil {
+		t.Fatalf("Split: %v", err)
+	}
+	if !strings.Contains(cv, "CV body") || strings.Contains(cv, "Summary") {
+		t.Errorf("the edits section leaked into the CV: %q", cv)
+	}
+	// The letter must stop at the marker, or the JSON renders as prose.
+	if strings.Contains(letter, "===EDITS===") || strings.Contains(letter, "section") {
+		t.Errorf("the edits section leaked into the letter: %q", letter)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("got %d edits, want 1", len(edits))
+	}
+	if edits[0].Section != "Summary" || edits[0].Reason != "matches payments" {
+		t.Errorf("edit parsed wrong: %+v", edits[0])
+	}
+}
+
+// The documents matter more than the annotations. A model that omits or
+// mangles the trailing array must not cost the CV and letter.
+func TestSplitSurvivesAMissingOrBrokenEditList(t *testing.T) {
+	cases := map[string]string{
+		"no edits section": "===CV===\nCV body\n===COVER_LETTER===\nLetter body",
+		"empty array":      "===CV===\nCV body\n===COVER_LETTER===\nLetter body\n===EDITS===\n[]",
+		"malformed json":   "===CV===\nCV body\n===COVER_LETTER===\nLetter body\n===EDITS===\n[{broken",
+		"prose instead":    "===CV===\nCV body\n===COVER_LETTER===\nLetter body\n===EDITS===\nI made a few changes.",
+	}
+	for name, reply := range cases {
+		t.Run(name, func(t *testing.T) {
+			cv, letter, edits, err := Split(reply)
+			if err != nil {
+				t.Fatalf("documents were lost over the edit list: %v", err)
+			}
+			if cv == "" || letter == "" {
+				t.Error("a document came back empty")
+			}
+			if edits != nil && len(edits) != 0 {
+				t.Errorf("expected no usable edits, got %v", edits)
+			}
+		})
+	}
+}
+
+func TestSplitToleratesAFencedEditList(t *testing.T) {
+	reply := "===CV===\nCV body\n===COVER_LETTER===\nLetter body\n===EDITS===\n" +
+		"```json\n[{\"section\":\"Skills\",\"before\":\"a, b\",\"after\":\"b, a\",\"reason\":\"their order\"}]\n```"
+
+	_, _, edits, err := Split(reply)
+	if err != nil {
+		t.Fatalf("Split: %v", err)
+	}
+	if len(edits) != 1 || edits[0].Section != "Skills" {
+		t.Errorf("fenced edit list not parsed: %v", edits)
+	}
+}
+
+// An entry quoting neither document is worse than no entry, because the
+// candidate will check. Empty-on-both is dropped; one side empty is a real
+// edit meaning text was cut or added.
+func TestParseEditsDropsEmptyEntriesButKeepsCuts(t *testing.T) {
+	edits := parseEdits(`[
+	  {"section":"A","before":"","after":"","reason":"nothing"},
+	  {"section":"Trimmed","before":"an old role","after":"","reason":"one page"}
+	]`)
+	if len(edits) != 1 {
+		t.Fatalf("got %d edits, want 1", len(edits))
+	}
+	if edits[0].Section != "Trimmed" || edits[0].After != "" {
+		t.Errorf("the cut was not preserved: %+v", edits[0])
+	}
+}
+
+func TestSystemPromptAsksForHonestEdits(t *testing.T) {
+	for _, want := range []string{"Only real changes", "Do not invent edits"} {
+		if !strings.Contains(systemPrompt, want) {
+			t.Errorf("system prompt is missing %q", want)
+		}
+	}
+}
+
+// Regression: on the first live run the model reported an "after" of
+// "Databases: MongoDb, Firestore" that appeared nowhere in the CV it had just
+// written. A diff the candidate cannot reconcile with the document teaches
+// them the annotations are decorative, which is worse than showing none.
+func TestValidateEditsDropsFabricatedChanges(t *testing.T) {
+	master := "Database: MongoDb, Firestore\nFour years of Flutter."
+	tailored := "# Victor\nDatabase: MongoDb, Firestore\nFour years of Flutter."
+
+	edits := []Edit{
+		{Section: "Skills", Before: "Database: MongoDb, Firestore",
+			After: "Databases: MongoDb, Firestore", Reason: "pluralised"},
+		{Section: "Summary", Before: "", After: "Four years of Flutter.",
+			Reason: "leads with the match"},
+	}
+
+	kept := ValidateEdits(edits, master, tailored)
+	if len(kept) != 1 {
+		t.Fatalf("kept %d edits, want 1 — the fabricated one should be dropped", len(kept))
+	}
+	if kept[0].Section != "Summary" {
+		t.Errorf("dropped the wrong edit: %+v", kept[0])
+	}
+}
+
+// Markdown emphasis and whitespace differ constantly between what a model
+// reports and what it wrote. Rejecting on that would discard honest edits.
+func TestValidateEditsIgnoresFormatting(t *testing.T) {
+	master := "Backend engineer with 7 years across fintech"
+	tailored := "## Summary\n\n**Backend engineer**   building   payment systems"
+
+	kept := ValidateEdits([]Edit{{
+		Section: "Summary",
+		Before:  "Backend engineer with 7 years across fintech",
+		After:   "Backend engineer building payment systems",
+	}}, master, tailored)
+
+	if len(kept) != 1 {
+		t.Error("a formatting difference caused an honest edit to be dropped")
+	}
+}
+
+func TestValidateEditsKeepsCutsAndAdditions(t *testing.T) {
+	master := "An old role nobody needs.\nFlutter work."
+	tailored := "Flutter work.\nNew line added."
+
+	kept := ValidateEdits([]Edit{
+		{Section: "Trimmed", Before: "An old role nobody needs.", After: ""},
+		{Section: "Added", Before: "", After: "New line added."},
+	}, master, tailored)
+
+	if len(kept) != 2 {
+		t.Errorf("cuts and additions should both survive, kept %d", len(kept))
+	}
+}
+
+func TestValidateEditsHandlesEmptyInput(t *testing.T) {
+	if got := ValidateEdits(nil, "a", "b"); got != nil {
+		t.Errorf("nil in should give nil out, got %v", got)
+	}
+	// Everything fabricated means nothing to show, not an empty list to render.
+	if got := ValidateEdits([]Edit{{Before: "nowhere", After: "nowhere either"}}, "a", "b"); got != nil {
+		t.Errorf("all-fabricated should give nil, got %v", got)
 	}
 }

@@ -229,13 +229,13 @@ LIMIT $2`
 // which keeps them meaningful now that the documents live in the row.
 const StoreDocuments = `
 UPDATE jobs SET
-    cv_edits          = $7,
     cv_text           = $2,
     cover_letter_text = $3,
     generated_by      = $4,
     generated_at      = now(),
     cv_url            = $5,
-    cover_letter_url  = $6
+    cover_letter_url  = $6,
+    cv_edits          = $7
 WHERE id = $1`
 
 // GetDocuments reads the generated documents back.

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -126,8 +127,22 @@ func (s *Service) storeDocuments(ctx context.Context, job models.Job, docs gener
 	cvURL := "/jobs/" + job.ID + "/cv"
 	letterURL := "/jobs/" + job.ID + "/cover-letter"
 
+	// Marshalled here rather than in the generate package, so that package
+	// stays free of storage concerns. A nil slice becomes SQL NULL, which is
+	// how "the model gave us no edits" is distinguished from "it gave us an
+	// empty list".
+	var editsJSON any
+	if len(docs.Edits) > 0 {
+		b, err := json.Marshal(docs.Edits)
+		if err != nil {
+			return fmt.Errorf("encode cv edits: %w", err)
+		}
+		editsJSON = b
+	}
+
 	if _, err := s.db.Pool.Exec(ctx, queries.StoreDocuments,
-		job.ID, docs.CV, docs.CoverLetter, docs.Model, cvURL, letterURL); err != nil {
+		job.ID, docs.CV, docs.CoverLetter, docs.Model, cvURL, letterURL,
+		editsJSON); err != nil {
 		return fmt.Errorf("write documents: %w", err)
 	}
 
@@ -141,7 +156,8 @@ func (s *Service) storeDocuments(ctx context.Context, job models.Job, docs gener
 	}
 
 	s.log.Info("documents generated", "job_id", job.ID, "title", job.Title,
-		"cv_chars", len(docs.CV), "letter_chars", len(docs.CoverLetter), "model", docs.Model)
+		"cv_chars", len(docs.CV), "letter_chars", len(docs.CoverLetter),
+		"edits", len(docs.Edits), "model", docs.Model)
 	return nil
 }
 
