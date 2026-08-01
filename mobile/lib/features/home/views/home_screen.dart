@@ -44,6 +44,11 @@ class HomeScreen extends GetView<HomeController> {
               slivers: [
                 SliverToBoxAdapter(child: _Greeting(user: user)),
 
+                if (controller.replies.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: _RepliesBanner(count: controller.replies.length),
+                  ),
+
                 if (controller.loading.value)
                   const SliverPadding(
                     padding: EdgeInsets.fromLTRB(
@@ -78,6 +83,66 @@ class HomeScreen extends GetView<HomeController> {
             ),
           );
         }),
+      ),
+    );
+  }
+}
+
+/// Surfaced above everything else: an interview invitation waiting unread is
+/// more costly than an unapproved job, which simply waits.
+class _RepliesBanner extends StatelessWidget {
+  const _RepliesBanner({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = L10n.of(context);
+    final text = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.md),
+      child: Material(
+        color: AppColors.success.withValues(alpha: 0.12),
+        borderRadius: AppRadii.innerShape,
+        child: InkWell(
+          borderRadius: AppRadii.innerShape,
+          onTap: () async {
+            await Get.toNamed<void>(Routes.replies);
+            await Get.find<HomeController>().refresh();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Row(
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: AppColors.success,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '$count',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(l.repliesNeedingYou, style: text.titleMedium),
+                ),
+                Icon(Icons.chevron_right_rounded,
+                    color: AppColors.success, size: 20),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -2,6 +2,8 @@ import 'package:get/get.dart';
 
 import '../../../core/error/failures.dart';
 import '../../../data/models/job.dart';
+import '../../../data/models/job_event.dart';
+import '../../../data/services/events_service.dart';
 import '../../../data/services/jobs_service.dart';
 import '../../../shared/widgets/app_toast.dart';
 
@@ -12,9 +14,15 @@ import '../../../shared/widgets/app_toast.dart';
 /// client-side, so the queue stays correct even when the recent list is paged.
 class HomeController extends GetxController {
   JobsService get _jobs => Get.find<JobsService>();
+  EventsService get _events => Get.find<EventsService>();
 
   final queue = <Job>[].obs;
   final recent = <Job>[].obs;
+
+  /// Employer replies awaiting a decision. Surfaced on the feed because they
+  /// are time-sensitive in a way an unapproved job is not — an interview
+  /// invitation sitting unread for a week is a real cost.
+  final replies = <JobEvent>[].obs;
 
   final loading = true.obs;
   final refreshing = false.obs;
@@ -57,6 +65,14 @@ class HomeController extends GetxController {
         _jobs.awaitingApproval(limit: 10),
         _jobs.list(limit: 10),
       ]);
+
+      // Replies are fetched separately and tolerated failing: an older backend
+      // without the events endpoints should still render a working feed.
+      try {
+        replies.assignAll(await _events.pending(limit: 20));
+      } on Failure {
+        replies.clear();
+      }
 
       queue.assignAll((results[0]).jobs);
       // The queue is already shown above; repeating those cards in "latest"

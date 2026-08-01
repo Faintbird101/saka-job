@@ -6,6 +6,8 @@ import '../features/approval/controllers/triage_controller.dart';
 import '../features/approval/views/triage_screen.dart';
 import '../features/home/controllers/home_controller.dart';
 import '../features/job_detail/controllers/job_detail_controller.dart';
+import '../features/notifications/controllers/replies_controller.dart';
+import '../features/notifications/views/replies_screen.dart';
 import '../features/job_detail/views/job_detail_screen.dart';
 import '../features/shell/shell_screen.dart';
 import '../features/splash/splash_screen.dart';
@@ -43,6 +45,13 @@ abstract final class AppPages {
             initial: args?['job'] as Job?,
           ),
         );
+      }),
+    ),
+    GetPage(
+      name: Routes.replies,
+      page: () => const RepliesScreen(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<RepliesController>(RepliesController.new);
       }),
     ),
     GetPage(

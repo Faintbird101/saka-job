@@ -7,6 +7,7 @@ abstract final class Routes {
   static const shell = '/app';
   static const jobDetail = '/job';
   static const triage = '/triage';
+  static const replies = '/replies';
   static const document = '/document';
   static const settings = '/settings';
   static const notifications = '/notifications';
