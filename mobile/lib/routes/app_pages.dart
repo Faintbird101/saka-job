@@ -2,6 +2,8 @@ import 'package:get/get.dart';
 
 import '../features/auth/controllers/auth_controller.dart';
 import '../features/auth/views/sign_in_screen.dart';
+import '../features/approval/controllers/triage_controller.dart';
+import '../features/approval/views/triage_screen.dart';
 import '../features/home/controllers/home_controller.dart';
 import '../features/shell/shell_screen.dart';
 import '../features/splash/splash_screen.dart';
@@ -23,6 +25,13 @@ abstract final class AppPages {
       page: () => const ShellScreen(),
       binding: BindingsBuilder(() {
         Get.lazyPut<HomeController>(HomeController.new);
+      }),
+    ),
+    GetPage(
+      name: Routes.triage,
+      page: () => const TriageScreen(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<TriageController>(TriageController.new);
       }),
     ),
     GetPage(

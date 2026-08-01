@@ -8,6 +8,7 @@ import '../../../data/services/auth_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/failure_view.dart';
 import '../../../shared/widgets/job_card.dart';
+import '../../../routes/app_routes.dart';
 import '../../../shared/widgets/skeletons.dart';
 import '../controllers/home_controller.dart';
 
@@ -173,7 +174,14 @@ class _Section extends StatelessWidget {
           return JobCard(
             job: job,
             featured: featuredFirst && index == 1,
-            onAction: job.isAwaitingApproval ? () {} : null,
+            onAction: job.isAwaitingApproval
+                ? () async {
+                    await Get.toNamed<void>(Routes.triage);
+                    // Whatever was decided in triage changed the queue, so the
+                    // feed is stale the moment it returns.
+                    await Get.find<HomeController>().refresh();
+                  }
+                : null,
           );
         },
       ),
