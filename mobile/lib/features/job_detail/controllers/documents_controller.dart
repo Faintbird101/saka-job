@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../../../core/error/failures.dart';
+import '../../../data/models/cv_edit.dart';
 import '../../../data/services/jobs_service.dart';
 
 /// Screen 07 — the generated CV and cover letter.
@@ -18,10 +19,17 @@ class DocumentsController extends GetxController {
 
   final cv = ''.obs;
   final coverLetter = ''.obs;
+
+  /// Verified server-side before storage, so every quotation here can be found
+  /// in the CV beside it.
+  final edits = <CvEdit>[].obs;
   final loading = true.obs;
   final Rxn<Failure> error = Rxn<Failure>();
 
-  /// 0 = CV, 1 = cover letter.
+  /// 0 = changes, 1 = full CV, 2 = cover letter.
+  ///
+  /// Changes leads, because the deck's whole argument is that the diff is what
+  /// makes the tailoring checkable — the finished CV is what you get anywhere.
   final tab = 0.obs;
 
   @override
@@ -42,6 +50,15 @@ class DocumentsController extends GetxController {
       ]);
       cv.value = results[0];
       coverLetter.value = results[1];
+
+      // The edit list rides on the job row rather than its own endpoint. It is
+      // allowed to fail on its own: losing the annotations must not cost the
+      // documents.
+      try {
+        edits.assignAll((await _jobs.byId(jobId)).cvEdits);
+      } on Failure {
+        edits.clear();
+      }
     } on Failure catch (f) {
       error.value = f;
     } finally {

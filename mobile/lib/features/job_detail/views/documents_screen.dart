@@ -6,6 +6,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/cv_diff.dart';
 import '../../../shared/widgets/failure_view.dart';
 import '../../../shared/widgets/skeletons.dart';
 import '../controllers/documents_controller.dart';
@@ -58,8 +59,16 @@ class DocumentsScreen extends GetView<DocumentsController> {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
                 child: SegmentedButton<int>(
                   segments: [
-                    ButtonSegment(value: 0, label: Text(l.fullCv)),
-                    ButtonSegment(value: 1, label: Text(l.coverLetter)),
+                    ButtonSegment(
+                      value: 0,
+                      // The count is the point: "Changes (4)" tells you how
+                      // much was done before you open it.
+                      label: Text(controller.edits.isEmpty
+                          ? l.changes
+                          : '${l.changes} (${controller.edits.length})'),
+                    ),
+                    ButtonSegment(value: 1, label: Text(l.fullCv)),
+                    ButtonSegment(value: 2, label: Text(l.coverLetter)),
                   ],
                   selected: {controller.tab.value},
                   showSelectedIcon: false,
@@ -69,11 +78,11 @@ class DocumentsScreen extends GetView<DocumentsController> {
               const SizedBox(height: AppSpacing.md),
 
               Expanded(
-                child: _Document(
-                  markdown: controller.tab.value == 0
-                      ? controller.cv.value
-                      : controller.coverLetter.value,
-                ),
+                child: switch (controller.tab.value) {
+                  0 => CvDiff(edits: controller.edits),
+                  1 => _Document(markdown: controller.cv.value),
+                  _ => _Document(markdown: controller.coverLetter.value),
+                },
               ),
             ],
           );

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'cv_edit.dart';
+
 /// The five axes behind a score.
 ///
 /// Each is nullable and null means "the posting did not say", not zero — the
@@ -101,6 +103,7 @@ class Job {
     this.datePosted,
     this.generatedAt,
     this.createdAt,
+    this.cvEdits = const [],
   });
 
   final String id;
@@ -126,6 +129,9 @@ class Job {
   final DateTime? generatedAt;
   final DateTime? createdAt;
 
+  /// What the agent changed in the CV, already verified server-side.
+  final List<CvEdit> cvEdits;
+
   factory Job.fromJson(Map<String, dynamic> json) => Job(
         id: (json['id'] ?? '') as String,
         title: (json['title'] ?? '') as String,
@@ -149,7 +155,30 @@ class Job {
         datePosted: _date(json['date_posted']),
         generatedAt: _date(json['generated_at']),
         createdAt: _date(json['created_at']),
+        cvEdits: _editList(json['cv_edits']),
       );
+
+  /// JSONB arrives as a List, but tolerate a raw string in case the column is
+  /// ever returned unparsed — a missing diff is a worse failure than a
+  /// defensive parser.
+  static List<CvEdit> _editList(dynamic v) {
+    final raw = switch (v) {
+      List() => v,
+      String s when s.isNotEmpty => () {
+          try {
+            final d = jsonDecode(s);
+            return d is List ? d : const [];
+          } catch (_) {
+            return const [];
+          }
+        }(),
+      _ => const [],
+    };
+    return raw
+        .whereType<Map>()
+        .map((e) => CvEdit.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
 
   /// "Nairobi, Kenya · Hybrid" — whichever parts exist.
   String get locationLabel {
