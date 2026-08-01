@@ -54,23 +54,31 @@ class JobsScreen extends GetView<JobsController> {
 
             SizedBox(
               height: 40,
-              child: Obx(
-                () => ListView.separated(
+              child: Obx(() {
+                // Read the observable HERE, in the Obx builder itself.
+                //
+                // Reading it inside itemBuilder instead looks equivalent but is
+                // not: ListView builds items lazily, after Obx has already
+                // returned, so Obx observes nothing and GetX throws "improper
+                // use of GetX". Hoisting it into a local both fixes the
+                // subscription and gives every chip the same value.
+                final active = controller.status.value;
+
+                return ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
                   itemCount: _filters.length,
                   separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
                   itemBuilder: (context, i) {
                     final value = _filters[i];
-                    final selected = controller.status.value == value;
                     return _FilterChip(
                       label: value.isEmpty ? l.seeAll : statusLabel(l, value),
-                      selected: selected,
+                      selected: active == value,
                       onTap: () => controller.setStatus(value),
                     );
                   },
-                ),
-              ),
+                );
+              }),
             ),
             const SizedBox(height: AppSpacing.md),
 

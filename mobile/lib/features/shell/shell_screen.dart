@@ -5,11 +5,8 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../../core/theme/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 import '../home/views/home_screen.dart';
-import '../jobs/controllers/jobs_controller.dart';
-import '../dashboard/controllers/pipeline_controller.dart';
 import '../dashboard/views/pipeline_screen.dart';
 import '../jobs/views/jobs_screen.dart';
-import '../profile/controllers/profile_controller.dart';
 import '../profile/views/profile_screen.dart';
 
 /// The tabbed shell.
@@ -28,12 +25,10 @@ class ShellScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = L10n.of(context);
-    final controller = Get.put(ShellController());
-    // Lazily created so the Jobs tab does not fetch until it is first opened —
-    // an IndexedStack builds every child, but the controller need not run.
-    Get.lazyPut<JobsController>(JobsController.new, fenix: true);
-    Get.lazyPut<PipelineController>(PipelineController.new, fenix: true);
-    Get.lazyPut<ProfileController>(ProfileController.new, fenix: true);
+    // Registered by the route binding, not here: build() runs on every
+    // rebuild, and constructing controllers in it allocates a new one each
+    // time even though GetX keeps the first.
+    final controller = Get.find<ShellController>();
 
     return Scaffold(
       body: Obx(

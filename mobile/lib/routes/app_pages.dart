@@ -11,6 +11,9 @@ import '../features/notifications/views/replies_screen.dart';
 import '../features/job_detail/controllers/documents_controller.dart';
 import '../features/job_detail/views/documents_screen.dart';
 import '../features/job_detail/views/job_detail_screen.dart';
+import '../features/dashboard/controllers/pipeline_controller.dart';
+import '../features/jobs/controllers/jobs_controller.dart';
+import '../features/profile/controllers/profile_controller.dart';
 import '../features/shell/shell_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../data/models/job.dart';
@@ -31,7 +34,15 @@ abstract final class AppPages {
       name: Routes.shell,
       page: () => const ShellScreen(),
       binding: BindingsBuilder(() {
+        Get.put<ShellController>(ShellController());
         Get.lazyPut<HomeController>(HomeController.new);
+        // fenix so a tab controller disposed under memory pressure is rebuilt
+        // on next access rather than throwing. Lazy, so opening the app does
+        // not fetch for three tabs the user may never visit — an IndexedStack
+        // builds every child, but the controller need not run.
+        Get.lazyPut<JobsController>(JobsController.new, fenix: true);
+        Get.lazyPut<PipelineController>(PipelineController.new, fenix: true);
+        Get.lazyPut<ProfileController>(ProfileController.new, fenix: true);
       }),
     ),
     GetPage(
