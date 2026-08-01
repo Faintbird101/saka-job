@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/job.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../routes/app_routes.dart';
 import '../../../shared/widgets/app_toast.dart';
 import '../../../shared/widgets/axis_bars.dart';
 import '../../../shared/widgets/failure_view.dart';
@@ -46,6 +47,10 @@ class JobDetailScreen extends GetView<JobDetailController> {
                   children: [
                     _ScoreCard(job: job),
                     const SizedBox(height: AppSpacing.lg),
+                    if (job.hasDocuments) ...[
+                      _DocumentsRow(job: job),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
                     if (job.matchedSkills.isNotEmpty)
                       _SkillGroup(
                         title: l.matchedSkills,
@@ -237,6 +242,54 @@ class _ScoreCard extends StatelessWidget {
     if (score >= 70) return l.goodMatch;
     if (score >= 50) return l.partialMatch;
     return l.weakMatch;
+  }
+}
+
+/// Opens the generated CV and cover letter. Only shown once they exist —
+/// offering a link to documents that were never generated would be a dead end.
+class _DocumentsRow extends StatelessWidget {
+  const _DocumentsRow({required this.job});
+
+  final Job job;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = L10n.of(context);
+    final text = Theme.of(context).textTheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+
+    return Material(
+      color: dark ? AppColors.darkSurface : AppColors.surface,
+      borderRadius: AppRadii.cardShape,
+      child: InkWell(
+        borderRadius: AppRadii.cardShape,
+        onTap: () => Get.toNamed<void>(
+          Routes.documents,
+          arguments: {'id': job.id, 'title': job.title},
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Row(
+            children: [
+              Icon(MdiIcons.fileDocumentCheckOutline,
+                  size: 20, color: AppColors.primary),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l.tailoredCv, style: text.titleMedium),
+                    Text(l.coverLetter, style: text.bodySmall),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  size: 20, color: AppColors.primary),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

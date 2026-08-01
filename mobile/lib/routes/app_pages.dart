@@ -8,6 +8,8 @@ import '../features/home/controllers/home_controller.dart';
 import '../features/job_detail/controllers/job_detail_controller.dart';
 import '../features/notifications/controllers/replies_controller.dart';
 import '../features/notifications/views/replies_screen.dart';
+import '../features/job_detail/controllers/documents_controller.dart';
+import '../features/job_detail/views/documents_screen.dart';
 import '../features/job_detail/views/job_detail_screen.dart';
 import '../features/shell/shell_screen.dart';
 import '../features/splash/splash_screen.dart';
@@ -43,6 +45,19 @@ abstract final class AppPages {
           () => JobDetailController(
             jobId: args?['id'] as String? ?? '',
             initial: args?['job'] as Job?,
+          ),
+        );
+      }),
+    ),
+    GetPage(
+      name: Routes.documents,
+      page: () => const DocumentsScreen(),
+      binding: BindingsBuilder(() {
+        final args = Get.arguments as Map<String, dynamic>?;
+        Get.lazyPut<DocumentsController>(
+          () => DocumentsController(
+            jobId: args?['id'] as String? ?? '',
+            jobTitle: args?['title'] as String? ?? '',
           ),
         );
       }),

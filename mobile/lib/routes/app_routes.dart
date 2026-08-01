@@ -8,6 +8,7 @@ abstract final class Routes {
   static const jobDetail = '/job';
   static const triage = '/triage';
   static const replies = '/replies';
+  static const documents = '/documents';
   static const document = '/document';
   static const settings = '/settings';
   static const notifications = '/notifications';
