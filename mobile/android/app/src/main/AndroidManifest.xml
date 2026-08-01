@@ -1,6 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Flutter only adds this to the debug and profile manifests, so a
+         release build would have no network at all. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Push notifications on Android 13+. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="saka_job"
+        android:label="Saka Job"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

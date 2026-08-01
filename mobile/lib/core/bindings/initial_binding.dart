@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../../data/services/auth_service.dart';
+import '../../data/services/jobs_service.dart';
 import '../network/api_client.dart';
 import '../storage/secure_store.dart';
 import '../theme/theme_controller.dart';
@@ -24,5 +25,6 @@ class InitialBinding extends Bindings {
     await Get.putAsync<SecureStore>(() => SecureStore().init(), permanent: true);
     await Get.putAsync<ApiClient>(() => ApiClient().init(), permanent: true);
     await Get.putAsync<AuthService>(() => AuthService().init(), permanent: true);
+    Get.put<JobsService>(JobsService(), permanent: true);
   }
 }

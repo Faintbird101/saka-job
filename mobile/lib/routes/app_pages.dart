@@ -2,6 +2,8 @@ import 'package:get/get.dart';
 
 import '../features/auth/controllers/auth_controller.dart';
 import '../features/auth/views/sign_in_screen.dart';
+import '../features/home/controllers/home_controller.dart';
+import '../features/shell/shell_screen.dart';
 import '../features/splash/splash_screen.dart';
 import 'app_routes.dart';
 
@@ -15,6 +17,13 @@ abstract final class AppPages {
     GetPage(
       name: Routes.splash,
       page: () => const SplashScreen(),
+    ),
+    GetPage(
+      name: Routes.shell,
+      page: () => const ShellScreen(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<HomeController>(HomeController.new);
+      }),
     ),
     GetPage(
       name: Routes.signIn,
