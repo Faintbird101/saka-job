@@ -5,6 +5,12 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../../core/theme/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 import '../home/views/home_screen.dart';
+import '../jobs/controllers/jobs_controller.dart';
+import '../dashboard/controllers/pipeline_controller.dart';
+import '../dashboard/views/pipeline_screen.dart';
+import '../jobs/views/jobs_screen.dart';
+import '../profile/controllers/profile_controller.dart';
+import '../profile/views/profile_screen.dart';
 
 /// The tabbed shell.
 ///
@@ -23,6 +29,11 @@ class ShellScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = L10n.of(context);
     final controller = Get.put(ShellController());
+    // Lazily created so the Jobs tab does not fetch until it is first opened —
+    // an IndexedStack builds every child, but the controller need not run.
+    Get.lazyPut<JobsController>(JobsController.new, fenix: true);
+    Get.lazyPut<PipelineController>(PipelineController.new, fenix: true);
+    Get.lazyPut<ProfileController>(ProfileController.new, fenix: true);
 
     return Scaffold(
       body: Obx(
@@ -30,9 +41,9 @@ class ShellScreen extends StatelessWidget {
           index: controller.index.value,
           children: const [
             HomeScreen(),
-            _Placeholder(label: 'Jobs'),
-            _Placeholder(label: 'Pipeline'),
-            _Placeholder(label: 'Profile'),
+            JobsScreen(),
+            PipelineScreen(),
+            ProfileScreen(),
           ],
         ),
       ),
@@ -69,20 +80,3 @@ class ShellScreen extends StatelessWidget {
   }
 }
 
-/// Stands in for the tabs not built yet. Deliberately says so rather than
-/// showing an empty screen that looks broken.
-class _Placeholder extends StatelessWidget {
-  const _Placeholder({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        '$label — coming next',
-        style: Theme.of(context).textTheme.bodyMedium,
-      ),
-    );
-  }
-}

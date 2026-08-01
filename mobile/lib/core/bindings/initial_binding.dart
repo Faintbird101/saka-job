@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import '../../data/services/auth_service.dart';
 import '../../data/services/jobs_service.dart';
+import '../../data/services/profile_service.dart';
 import '../../data/services/push_service.dart';
 import '../network/api_client.dart';
 import '../storage/secure_store.dart';
@@ -27,6 +28,7 @@ class InitialBinding extends Bindings {
     await Get.putAsync<ApiClient>(() => ApiClient().init(), permanent: true);
     await Get.putAsync<AuthService>(() => AuthService().init(), permanent: true);
     Get.put<JobsService>(JobsService(), permanent: true);
+    Get.put<ProfileService>(ProfileService(), permanent: true);
     // Push is initialised but not permission-prompted here — see
     // PushService.enable, which runs after sign-in.
     await Get.putAsync<PushService>(() => PushService().init(), permanent: true);
