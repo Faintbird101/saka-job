@@ -5,6 +5,8 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/failure_view.dart';
+import '../../../shared/widgets/skeletons.dart';
 import '../controllers/auth_controller.dart';
 
 /// Screen 01 — sign in, doubling as first-run setup.
@@ -29,6 +31,20 @@ class SignInScreen extends GetView<AuthController> {
               vertical: AppSpacing.section,
             ),
             child: Obx(() {
+              // Until the reachability check finishes we do not know whether to
+              // offer sign-in or setup, so the form is not shown at all.
+              if (controller.checkingSetup.value) {
+                return const _CheckingSkeleton();
+              }
+
+              final startupError = controller.startupError.value;
+              if (startupError != null) {
+                return FailureView(
+                  failure: startupError,
+                  onRetry: controller.retry,
+                );
+              }
+
               final isSetup = controller.needsSetup.value;
 
               return Form(
@@ -128,6 +144,33 @@ class SignInScreen extends GetView<AuthController> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Shown while the app works out whether an account exists. Shaped like the
+/// form that is coming, so nothing jumps when it arrives.
+class _CheckingSkeleton extends StatelessWidget {
+  const _CheckingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: const [
+        _Logo(),
+        SizedBox(height: AppSpacing.xxl),
+        Skeleton(width: 220, height: 26, radius: 10),
+        SizedBox(height: AppSpacing.md),
+        Skeleton(width: 280, height: 14, radius: 8),
+        SizedBox(height: AppSpacing.section),
+        Skeleton(width: double.infinity, height: 56, radius: AppRadii.inner),
+        SizedBox(height: AppSpacing.lg),
+        Skeleton(width: double.infinity, height: 56, radius: AppRadii.inner),
+        SizedBox(height: AppSpacing.xxl),
+        Skeleton(width: double.infinity, height: 52, radius: AppRadii.pill),
+      ],
     );
   }
 }

@@ -27,6 +27,14 @@ class AuthController extends GetxController {
   final needsSetup = false.obs;
   final checkingSetup = true.obs;
 
+  /// Set when the reachability check itself failed.
+  ///
+  /// The screen shows the failure state rather than the form. Showing a working
+  /// sign-in form when the server is unreachable makes a network problem look
+  /// identical to a working app — you type a password, wait, and get a second
+  /// failure that explains nothing new.
+  final Rxn<Failure> startupError = Rxn<Failure>();
+
   @override
   void onInit() {
     super.onInit();
@@ -41,16 +49,19 @@ class AuthController extends GetxController {
     super.onClose();
   }
 
+  /// Re-runs the reachability check, for the retry button.
+  Future<void> retry() => _checkSetup();
+
   Future<void> _checkSetup() async {
     checkingSetup.value = true;
+    startupError.value = null;
     try {
       needsSetup.value = await _auth.needsSetup();
     } on Failure catch (f) {
-      // Unreachable server. Assume an account exists and show sign-in: a
-      // wrongly-shown setup screen would fail confusingly on submit, whereas
-      // sign-in fails with an honest network error.
-      needsSetup.value = false;
-      AppToast.failure(f);
+      // Surfaced as a full failure state, not a toast: until we know whether an
+      // account exists, we cannot honestly show either the sign-in or the setup
+      // form, and guessing produces a screen that fails confusingly on submit.
+      startupError.value = f;
     } finally {
       checkingSetup.value = false;
     }

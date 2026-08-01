@@ -173,6 +173,13 @@ class _Section extends StatelessWidget {
           final job = jobs[index - 1];
           return JobCard(
             job: job,
+            onTap: () async {
+              await Get.toNamed<void>(
+                Routes.jobDetail,
+                arguments: {'id': job.id, 'job': job},
+              );
+              await Get.find<HomeController>().refresh();
+            },
             featured: featuredFirst && index == 1,
             onAction: job.isAwaitingApproval
                 ? () async {

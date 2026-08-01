@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "244126143889",
+    "project_id": "saka-job-4c549",
+    "storage_bucket": "saka-job-4c549.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:244126143889:android:1733111844759637f8f630",
+        "android_client_info": {
+          "package_name": "com.sakajob.saka_job"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDP7CnyUGpxU5yUt2z1sRa9xa_9HKGoKT4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
