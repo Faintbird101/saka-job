@@ -49,6 +49,13 @@ class SignInScreen extends GetView<AuthController> {
 
               return Form(
                 key: controller.formKey,
+                // Without this, validators only re-run when validate() is
+                // called, so an error raised by tapping Sign in stays on screen
+                // while you correct the field — a valid address sitting under
+                // "that does not look like an email address". onUserInteraction
+                // re-checks as you type, so the message clears when it stops
+                // being true.
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,

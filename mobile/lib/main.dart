@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:toastification/toastification.dart';
 
 import 'core/bindings/initial_binding.dart';
+import 'core/lifecycle/session_watcher.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'l10n/app_localizations.dart';
@@ -24,6 +25,10 @@ Future<void> main() async {
   // Services first, so the very first frame already knows whether there is a
   // session — no flash of the sign-in screen for a signed-in user.
   await InitialBinding.initServices();
+
+  // Enforces the 24h inactivity rule on resume, not just at startup: a process
+  // that is never killed would otherwise keep a stale session alive forever.
+  SessionWatcher.instance.start();
 
   runApp(const SakaJobApp());
 }

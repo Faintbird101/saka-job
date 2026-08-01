@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/error/failures.dart';
 import '../../../data/services/auth_service.dart';
+import '../../../data/services/push_service.dart';
 import '../../../routes/app_routes.dart';
 import '../../../shared/widgets/app_toast.dart';
 
@@ -103,6 +106,12 @@ class AuthController extends GetxController {
           password: passwordField.text,
         );
       }
+      // Ask for notification permission only now: prompting on the very first
+      // screen, before the app has shown what it does, is the request most
+      // people decline out of hand. Deliberately not awaited — a slow or
+      // refused prompt must not delay getting into the app.
+      unawaited(Get.find<PushService>().enable());
+
       Get.offAllNamed(Routes.shell);
     } on Failure catch (f) {
       AppToast.failure(f);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response, FormData, MultipartFile;
 
@@ -44,6 +46,11 @@ class ApiClient extends GetxService {
         },
         onResponse: (response, handler) {
           final status = response.statusCode ?? 0;
+          if (status >= 200 && status < 300) {
+            // Any successful authenticated call counts as activity, so the
+            // inactivity window measures real use rather than app launches.
+            unawaited(Get.find<SecureStore>().touchActivity());
+          }
           if (status == 401) {
             // Expired or revoked. Signing out here rather than in every caller
             // means a revoked session cannot leave the app in a half-signed-in
