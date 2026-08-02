@@ -70,6 +70,25 @@ abstract final class AppToast {
     required Color color,
     String? detail,
   }) {
+    // A toast is a notification about something that already happened. If it
+    // cannot be shown — no widget tree yet, or a unit test with no
+    // ToastificationWrapper — that must not propagate into the logic that
+    // raised it. A failed decision rolling back correctly matters; telling the
+    // user about it is secondary and best-effort.
+    try {
+      _showOrThrow(message, icon: icon, color: color, detail: detail);
+    } catch (_) {
+      // Deliberately swallowed. The alternative is an exception escaping from
+      // an error handler, which replaces a recoverable failure with a crash.
+    }
+  }
+
+  static void _showOrThrow(
+    String message, {
+    required IconData icon,
+    required Color color,
+    String? detail,
+  }) {
     toastification.show(
       type: ToastificationType.custom(message, color, icon),
       style: ToastificationStyle.flatColored,
