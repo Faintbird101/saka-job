@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/error/failures.dart';
+import '../../../core/storage/secure_store.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../data/services/push_service.dart';
 import '../../../routes/app_routes.dart';
@@ -112,7 +113,12 @@ class AuthController extends GetxController {
       // refused prompt must not delay getting into the app.
       unawaited(Get.find<PushService>().enable());
 
-      Get.offAllNamed(Routes.shell);
+      // Onboarding once, keyed on having seen it rather than on having just
+      // signed up — a reinstall or a sign-out and back in should not repeat it,
+      // and someone who created the account on another device has still never
+      // seen it here.
+      final seen = Get.find<SecureStore>().hasOnboarded;
+      Get.offAllNamed(seen ? Routes.shell : Routes.onboarding);
     } on Failure catch (f) {
       AppToast.failure(f);
     } finally {

@@ -1,9 +1,7 @@
 {
   "@@locale": "sw",
-
   "appName": "Saka Job",
   "tagline": "Wakala wako anatuma maombi. Wewe unakubali tu.",
-
   "signIn": "Ingia",
   "signOut": "Toka",
   "email": "Barua pepe",
@@ -18,8 +16,13 @@
   "emailInvalid": "Hii haionekani kama barua pepe",
   "passwordRequired": "Weka nenosiri lako",
   "passwordTooShort": "Angalau herufi {count}",
-  "@passwordTooShort": { "placeholders": { "count": { "type": "int" } } },
-
+  "@passwordTooShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "home": "Nyumbani",
   "jobs": "Kazi",
   "pipeline": "Mtiririko",
@@ -27,7 +30,6 @@
   "goodMorning": "Habari za asubuhi",
   "goodAfternoon": "Habari za mchana",
   "goodEvening": "Habari za jioni",
-
   "needsYourYes": "Zinasubiri idhini yako",
   "latestMatches": "Zinazolingana hivi karibuni",
   "seeAll": "Ona zote",
@@ -35,16 +37,26 @@
   "nothingToReview": "Hakuna kinachokusubiri",
   "nothingToReviewBody": "Wakala bado anasoma. Nafasi mpya zitafika baada ya uchambuzi ujao.",
   "searchHint": "Tafuta nafasi, kampuni...",
-
   "approve": "Kubali",
   "approveAndApply": "Kubali na tuma",
   "pass": "Ruka",
   "askForEdits": "Omba marekebisho",
   "jobsLeft": "{count, plural, =0{Zimekwisha} =1{1 imebaki} other{{count} zimebaki}}",
-  "@jobsLeft": { "placeholders": { "count": { "type": "int" } } },
+  "@jobsLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "aboutMinutes": "takribani dakika {count}",
-  "@aboutMinutes": { "placeholders": { "count": { "type": "int" } } },
-
+  "@aboutMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "aiScore": "Alama ya AI",
   "theRole": "Nafasi",
   "strongMatch": "Inalingana sana",
@@ -52,9 +64,21 @@
   "partialMatch": "Inalingana kiasi",
   "weakMatch": "Hailingani sana",
   "aboveThreshold": "Juu ya kiwango chako cha {threshold}",
-  "@aboveThreshold": { "placeholders": { "threshold": { "type": "int" } } },
+  "@aboveThreshold": {
+    "placeholders": {
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
   "belowThreshold": "Chini ya kiwango chako cha {threshold}",
-  "@belowThreshold": { "placeholders": { "threshold": { "type": "int" } } },
+  "@belowThreshold": {
+    "placeholders": {
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
   "axisSkills": "Ujuzi na teknolojia",
   "axisSeniority": "Kiwango cha uzoefu",
   "axisDomain": "Sekta",
@@ -62,10 +86,15 @@
   "axisPay": "Malipo dhidi ya kiwango chako",
   "axisUnknown": "Haijatajwa",
   "weakestAxis": "Dhaifu zaidi: {axis}",
-  "@weakestAxis": { "placeholders": { "axis": { "type": "String" } } },
+  "@weakestAxis": {
+    "placeholders": {
+      "axis": {
+        "type": "String"
+      }
+    }
+  },
   "matchedSkills": "Zinazolingana",
   "missingSkills": "Hazijathibitishwa",
-
   "tailoredCv": "CV iliyoboreshwa",
   "coverLetter": "Barua ya maombi",
   "changes": "Mabadiliko",
@@ -73,7 +102,6 @@
   "noDiffYet": "CV hii iliundwa kabla ya ufuatiliaji wa mabadiliko. Iunde upya ili kuona mabadiliko.",
   "looksGoodSendIt": "Inafaa — ituma",
   "viewPosting": "Ona tangazo",
-
   "statusNew": "Mpya",
   "statusScored": "Imepimwa",
   "statusLowMatch": "Hailingani",
@@ -90,7 +118,6 @@
   "statusInterviewing": "Usaili",
   "statusOfferReceived": "Ofa",
   "statusEmployerRejected": "Hukuchaguliwa",
-
   "inYourQueue": "Kwenye foleni yako",
   "waitingOnYou": "zinasubiri idhini yako",
   "applied": "Umetuma",
@@ -98,8 +125,13 @@
   "interview": "Usaili",
   "offer": "Ofa",
   "liveApplications": "Maombi {count} yanaendelea",
-  "@liveApplications": { "placeholders": { "count": { "type": "int" } } },
-
+  "@liveApplications": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "masterCv": "CV kuu",
   "replace": "Badilisha",
   "upload": "Pakia",
@@ -125,12 +157,10 @@
   "notifyOnReply": "Majibu ya waajiri",
   "notifyOnFollowUp": "Ufuatiliaji unaohitajika",
   "notifyOnFailure": "Matatizo ya mfumo",
-
   "repliesNeedingYou": "Majibu yanayokusubiri",
   "confirmSuggestion": "Je, hii ni sahihi?",
   "yesConfirm": "Ndiyo, ni sahihi",
   "noDismiss": "Hapana, ondoa",
-
   "retry": "Jaribu tena",
   "workOffline": "Tumia bila mtandao",
   "couldNotReach": "Hatukuweza kumfikia wakala",
@@ -141,5 +171,11 @@
   "save": "Hifadhi",
   "saved": "Imehifadhiwa",
   "close": "Funga",
-  "loading": "Inapakia"
+  "loading": "Inapakia",
+  "onboardCvTitle": "Weka CV yako",
+  "onboardCvBody": "Faili moja ya PDF au Word. Wakala ataisoma na kujenga wasifu wako.",
+  "onboardBarTitle": "Weka kiwango chako",
+  "onboardBarBody": "Kiwango cha alama, malipo ya chini, kazi ya mbali au la — badilisha wakati wowote.",
+  "onboardYesTitle": "Kubali kila asubuhi",
+  "onboardYesBody": "Dakika chache kwa siku. Mengine yote yatashughulikiwa."
 }

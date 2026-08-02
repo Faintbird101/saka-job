@@ -10,6 +10,7 @@ abstract final class Routes {
   static const replies = '/replies';
   static const documents = '/documents';
   static const masterCv = '/master-cv';
+  static const onboarding = '/onboarding';
   static const document = '/document';
   static const settings = '/settings';
   static const notifications = '/notifications';

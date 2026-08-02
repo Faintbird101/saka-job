@@ -402,4 +402,24 @@ class L10nEn extends L10n {
 
   @override
   String get loading => 'Loading';
+
+  @override
+  String get onboardCvTitle => 'Drop in your CV';
+
+  @override
+  String get onboardCvBody =>
+      'One PDF or Word file. The agent reads it and builds your profile.';
+
+  @override
+  String get onboardBarTitle => 'Set your bar';
+
+  @override
+  String get onboardBarBody =>
+      'Score threshold, pay floor, remote or not — change it any time.';
+
+  @override
+  String get onboardYesTitle => 'Say yes each morning';
+
+  @override
+  String get onboardYesBody => 'A few minutes a day. It handles the rest.';
 }

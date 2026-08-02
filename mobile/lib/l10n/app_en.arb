@@ -1,9 +1,7 @@
 {
   "@@locale": "en",
-
   "appName": "Saka Job",
   "tagline": "Your agent applies. You just say yes.",
-
   "signIn": "Sign in",
   "signOut": "Sign out",
   "email": "Email",
@@ -18,8 +16,13 @@
   "emailInvalid": "That does not look like an email address",
   "passwordRequired": "Enter your password",
   "passwordTooShort": "At least {count} characters",
-  "@passwordTooShort": { "placeholders": { "count": { "type": "int" } } },
-
+  "@passwordTooShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "home": "Home",
   "jobs": "Jobs",
   "pipeline": "Pipeline",
@@ -27,7 +30,6 @@
   "goodMorning": "Good morning",
   "goodAfternoon": "Good afternoon",
   "goodEvening": "Good evening",
-
   "needsYourYes": "Needs your yes",
   "latestMatches": "Latest matches",
   "seeAll": "See all",
@@ -35,16 +37,26 @@
   "nothingToReview": "Nothing waiting on you",
   "nothingToReviewBody": "Your agent is still reading. New matches land after the next scan.",
   "searchHint": "Search roles, companies...",
-
   "approve": "Approve",
   "approveAndApply": "Approve & apply",
   "pass": "Pass",
   "askForEdits": "Ask for edits",
   "jobsLeft": "{count, plural, =0{All done} =1{1 left} other{{count} left}}",
-  "@jobsLeft": { "placeholders": { "count": { "type": "int" } } },
+  "@jobsLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "aboutMinutes": "about {count} min",
-  "@aboutMinutes": { "placeholders": { "count": { "type": "int" } } },
-
+  "@aboutMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "aiScore": "AI score",
   "theRole": "The role",
   "strongMatch": "Strong match",
@@ -52,9 +64,21 @@
   "partialMatch": "Partial match",
   "weakMatch": "Weak match",
   "aboveThreshold": "Above your {threshold} threshold",
-  "@aboveThreshold": { "placeholders": { "threshold": { "type": "int" } } },
+  "@aboveThreshold": {
+    "placeholders": {
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
   "belowThreshold": "Below your {threshold} threshold",
-  "@belowThreshold": { "placeholders": { "threshold": { "type": "int" } } },
+  "@belowThreshold": {
+    "placeholders": {
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
   "axisSkills": "Skills & stack",
   "axisSeniority": "Seniority fit",
   "axisDomain": "Domain",
@@ -62,10 +86,15 @@
   "axisPay": "Pay vs your floor",
   "axisUnknown": "Not stated",
   "weakestAxis": "Weakest: {axis}",
-  "@weakestAxis": { "placeholders": { "axis": { "type": "String" } } },
+  "@weakestAxis": {
+    "placeholders": {
+      "axis": {
+        "type": "String"
+      }
+    }
+  },
   "matchedSkills": "Matched",
   "missingSkills": "Not evidenced",
-
   "tailoredCv": "Tailored CV",
   "coverLetter": "Cover letter",
   "changes": "Changes",
@@ -73,7 +102,6 @@
   "noDiffYet": "This CV was generated before edit tracking. Regenerate to see the changes.",
   "looksGoodSendIt": "Looks good — send it",
   "viewPosting": "View posting",
-
   "statusNew": "New",
   "statusScored": "Scored",
   "statusLowMatch": "Low match",
@@ -90,7 +118,6 @@
   "statusInterviewing": "Interviewing",
   "statusOfferReceived": "Offer",
   "statusEmployerRejected": "Not selected",
-
   "inYourQueue": "In your queue",
   "waitingOnYou": "waiting on your yes",
   "applied": "Applied",
@@ -98,8 +125,13 @@
   "interview": "Interview",
   "offer": "Offer",
   "liveApplications": "{count} live applications",
-  "@liveApplications": { "placeholders": { "count": { "type": "int" } } },
-
+  "@liveApplications": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "masterCv": "Master CV",
   "replace": "Replace",
   "upload": "Upload",
@@ -125,12 +157,10 @@
   "notifyOnReply": "Employer replies",
   "notifyOnFollowUp": "Follow-ups due",
   "notifyOnFailure": "Pipeline problems",
-
   "repliesNeedingYou": "Replies needing you",
   "confirmSuggestion": "Is this right?",
   "yesConfirm": "Yes, that's right",
   "noDismiss": "No, dismiss",
-
   "retry": "Try again",
   "workOffline": "Work offline",
   "couldNotReach": "We couldn't reach the agent",
@@ -141,5 +171,11 @@
   "save": "Save",
   "saved": "Saved",
   "close": "Close",
-  "loading": "Loading"
+  "loading": "Loading",
+  "onboardCvTitle": "Drop in your CV",
+  "onboardCvBody": "One PDF or Word file. The agent reads it and builds your profile.",
+  "onboardBarTitle": "Set your bar",
+  "onboardBarBody": "Score threshold, pay floor, remote or not — change it any time.",
+  "onboardYesTitle": "Say yes each morning",
+  "onboardYesBody": "A few minutes a day. It handles the rest."
 }

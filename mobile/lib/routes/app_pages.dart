@@ -15,6 +15,7 @@ import '../features/dashboard/controllers/pipeline_controller.dart';
 import '../features/jobs/controllers/jobs_controller.dart';
 import '../features/profile/controllers/cv_controller.dart';
 import '../features/profile/controllers/profile_controller.dart';
+import '../features/onboarding/views/onboarding_screen.dart';
 import '../features/profile/views/cv_screen.dart';
 import '../features/shell/shell_screen.dart';
 import '../features/splash/splash_screen.dart';
@@ -61,6 +62,10 @@ abstract final class AppPages {
           ),
         );
       }),
+    ),
+    GetPage(
+      name: Routes.onboarding,
+      page: () => const OnboardingScreen(),
     ),
     GetPage(
       name: Routes.masterCv,

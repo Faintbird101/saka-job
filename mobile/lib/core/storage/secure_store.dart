@@ -20,6 +20,7 @@ class SecureStore extends GetxService {
   static const _kLastActive = 'last_active_at';
   static const _kThemeMode = 'theme_mode';
   static const _kLocale = 'locale';
+  static const _kOnboarded = 'onboarding_seen';
 
   final _secure = const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -114,6 +115,14 @@ class SecureStore extends GetxService {
     if (last == null) return false;
     return DateTime.now().difference(last) > limit;
   }
+
+  /// Whether the three-step intro has been shown.
+  ///
+  /// Not part of the session: it survives sign-out, because the explanation is
+  /// about the product rather than the account, and re-showing it to someone
+  /// signing back in would be noise.
+  bool get hasOnboarded => _prefs.getBool(_kOnboarded) ?? false;
+  Future<void> markOnboardingSeen() => _prefs.setBool(_kOnboarded, true);
 
   // ---- preferences ----
 

@@ -402,4 +402,25 @@ class L10nSw extends L10n {
 
   @override
   String get loading => 'Inapakia';
+
+  @override
+  String get onboardCvTitle => 'Weka CV yako';
+
+  @override
+  String get onboardCvBody =>
+      'Faili moja ya PDF au Word. Wakala ataisoma na kujenga wasifu wako.';
+
+  @override
+  String get onboardBarTitle => 'Weka kiwango chako';
+
+  @override
+  String get onboardBarBody =>
+      'Kiwango cha alama, malipo ya chini, kazi ya mbali au la — badilisha wakati wowote.';
+
+  @override
+  String get onboardYesTitle => 'Kubali kila asubuhi';
+
+  @override
+  String get onboardYesBody =>
+      'Dakika chache kwa siku. Mengine yote yatashughulikiwa.';
 }

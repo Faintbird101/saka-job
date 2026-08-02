@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/storage/secure_store.dart';
 import '../../data/services/auth_service.dart';
 import '../../routes/app_routes.dart';
 
@@ -24,7 +25,15 @@ class _SplashScreenState extends State<SplashScreen> {
     // After the first frame, so a route change is never issued mid-build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final signedIn = Get.find<AuthService>().isSignedIn;
-      Get.offAllNamed(signedIn ? Routes.shell : Routes.signIn);
+      if (!signedIn) {
+        Get.offAllNamed(Routes.signIn);
+        return;
+      }
+      // Checked here too, not just after sign-in: an app killed part-way
+      // through onboarding would otherwise skip it forever, since the next
+      // launch restores the session and never passes through the auth screen.
+      final seen = Get.find<SecureStore>().hasOnboarded;
+      Get.offAllNamed(seen ? Routes.shell : Routes.onboarding);
     });
   }
 

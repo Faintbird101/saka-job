@@ -834,6 +834,42 @@ abstract class L10n {
   /// In en, this message translates to:
   /// **'Loading'**
   String get loading;
+
+  /// No description provided for @onboardCvTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop in your CV'**
+  String get onboardCvTitle;
+
+  /// No description provided for @onboardCvBody.
+  ///
+  /// In en, this message translates to:
+  /// **'One PDF or Word file. The agent reads it and builds your profile.'**
+  String get onboardCvBody;
+
+  /// No description provided for @onboardBarTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set your bar'**
+  String get onboardBarTitle;
+
+  /// No description provided for @onboardBarBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Score threshold, pay floor, remote or not — change it any time.'**
+  String get onboardBarBody;
+
+  /// No description provided for @onboardYesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Say yes each morning'**
+  String get onboardYesTitle;
+
+  /// No description provided for @onboardYesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A few minutes a day. It handles the rest.'**
+  String get onboardYesBody;
 }
 
 class _L10nDelegate extends LocalizationsDelegate<L10n> {
